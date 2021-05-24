@@ -69,7 +69,7 @@ public class ClientThread implements Runnable {
     }
     this.props = props;
     measurements = Measurements.getMeasurements();
-    spinSleep = Boolean.valueOf(this.props.getProperty("spin.sleep", "false"));
+    spinSleep = Boolean.parseBoolean(this.props.getProperty("spin.sleep", "false"));
     this.completeLatch = completeLatch;
   }
 
@@ -114,8 +114,8 @@ public class ClientThread implements Runnable {
       sleepUntil(System.nanoTime() + randomMinorDelay);
     }
     try {
+      long startTimeNanos = System.nanoTime();
       if (dotransactions) {
-        long startTimeNanos = System.nanoTime();
 
         while (((opcount == 0) || (opsdone < opcount)) && !workload.isStopRequested()) {
 
@@ -128,7 +128,6 @@ public class ClientThread implements Runnable {
           throttleNanos(startTimeNanos);
         }
       } else {
-        long startTimeNanos = System.nanoTime();
 
         while (((opcount == 0) || (opsdone < opcount)) && !workload.isStopRequested()) {
 
@@ -181,6 +180,6 @@ public class ClientThread implements Runnable {
    */
   int getOpsTodo() {
     int todo = opcount - opsdone;
-    return todo < 0 ? 0 : todo;
+    return Math.max(todo, 0);
   }
 }
