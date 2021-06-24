@@ -99,7 +99,7 @@ public class CassandraCQLClient extends DB {
           localDC = getProperties().getProperty(LOCAL_DC_PROPERTY);
           if (localDC == null) {
             throw new DBException(String.format(
-                "Required property \"%s\" missing fkor CassandraCQLClient",
+                "Required property \"%s\" missing for CassandraCQLClient",
                 LOCAL_DC_PROPERTY));
           }
           System.err.println("LocalDC: " + localDC);
