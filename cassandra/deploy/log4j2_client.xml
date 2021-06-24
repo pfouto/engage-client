@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="INFO" shutdownHook="disable">
+  <Appenders>
+    <Console name="Console" target="SYSTEM_OUT">
+      <PatternLayout pattern="%highlight{%level{length=1} [%t] %d{HH:mm:ss,SSS} %logger{0}} %msg%n"/>
+    </Console>
+
+  </Appenders>
+
+  <Loggers>
+    <!-- UNCOMMENT TO SPECIFY LOG LEVEL OF PACKAGES
+    <Logger level="info" name="protocols.apps"/>
+    <Logger level="info" name="protocols.overlays"/>
+    <Logger level="debug" name="protocols.dissemination"/>
+    -->
+
+    <Logger level="info" name="io.netty"/>
+    <Logger level="info" name="pt.unl.fct.di.novasys.network"/>
+    <Logger level="info" name="pt.unl.fct.di.novasys.channel"/>
+    <Logger level="info" name="pt.unl.fct.di.novasys.babel"/>
+
+    <!--Logger name="metrics">
+        <AppenderRef ref="MyFile" level="all"/>
+    </Logger-->
+
+    <Root level="info">
+      <AppenderRef ref="Console" level="warn"/>
+    </Root>
+  </Loggers>
+
+</Configuration>

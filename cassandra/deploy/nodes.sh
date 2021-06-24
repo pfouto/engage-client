@@ -1,3 +1,4 @@
+#!/bin/bash
 nodes=$(uniq "$OAR_NODEFILE" | sed -n '1!p' | sort -t - -k 2 -g)
 
 for n in $nodes

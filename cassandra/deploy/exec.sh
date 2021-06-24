@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
 
 # ----------------------------------- CONSTANTS -------------------------------
-xmx="85G"
-xms="85G"
-
 RED='\033[0;31m'
 BLUE='\033[0;34m'
 GREEN='\033[0;32m'
@@ -110,8 +107,8 @@ fi
 #done
 #serverswithoutport=${serverswithoutport::-1}
 
-client_nodes=$(tail -n "$n_clients" <<<"$all_nodes")
-server_nodes=$(head -n "$n_servers" <<<"$all_nodes")
+mapfile -t client_nodes < <(tail -n "$n_clients" <<<"$all_nodes")
+mapfile -t server_nodes < <(head -n "$n_servers" <<<"$all_nodes")
 
 IFS=', ' read -r -a algslist <<<"$algs_arg"
 IFS=', ' read -r -a readslist <<<"$reads_arg"
@@ -123,9 +120,9 @@ total_runs=$((n_runs * ${#algslist[@]} * ${#readslist[@]} * ${#threadslist[@]}))
 echo -e "$BLUE \n ---- CONFIG ---- $NC"
 echo -e "$GREEN exp_name: $NC ${exp_name}"
 # shellcheck disable=SC2086
-echo -e "$GREEN servers (${n_servers}): $NC" $server_nodes
+echo -e "$GREEN servers (${n_servers}): $NC" ${server_nodes[*]}
 # shellcheck disable=SC2086
-echo -e "$GREEN clients (${n_clients}): $NC" $client_nodes
+echo -e "$GREEN clients (${n_clients}): $NC" ${client_nodes[*]}
 echo -e "$GREEN n_runs: $NC ${n_runs}"
 echo -e "$GREEN start_run: $NC ${start_run}"
 echo -e "$GREEN reads percent: $NC ${readslist[*]}"
@@ -140,16 +137,15 @@ sleep 3
 
 # ----------------------------------- START EXP -------------------------------
 
-#TODO setup cassandra (rsync + ant)
-for server_node in $server_nodes; do
-  oarsh "$server_node" "mkdir -p /tmp/cass && rsync -varzP /home/pfouto/engage/cass/ /tmp/cass/${OAR_JOB_ID} \
-                                && cd /tmp/cass/${OAR_JOB_ID} && CASSANDRA_USE_JDK11=true ant" &
-done
+#rm -rf /tmp/cass
+
 echo -e "$GREEN -- Waiting for compilation $NC"
+for server_node in "${server_nodes[@]}"; do
+  oarsh "$server_node" "mkdir -p /tmp/cass && rsync -arzP /home/pfouto/engage/cass/ /tmp/cass/${OAR_JOB_ID} \
+                                && cd /tmp/cass/${OAR_JOB_ID} && CASSANDRA_USE_JDK11=true ant > /dev/null" &
+done
 wait
 echo -e "$GREEN -- Compilation finished $NC"
-
-exit
 
 for alg in "${algslist[@]}"; do # ----------------------------------- ALG
   echo -e "$GREEN -- -- -- -- -- -- STARTING ALG $NC$alg"
@@ -160,21 +156,68 @@ for alg in "${algslist[@]}"; do # ----------------------------------- ALG
     mf_enabled="true"
   fi
 
-  meta_pids=()
+  echo -e "$BLUE Setting alg in cassandra.yaml to ${alg} $NC"
+
+  for server_node in "${server_nodes[@]}"; do
+    oarsh "$server_node" "sed -i \"s/^\(\s*protocol\s*:\s*\).*/\1'${alg}'/\"" /tmp/cass/"${OAR_JOB_ID}"/conf/cassandra.yaml
+  done
+
   unset meta_pids
+  meta_pids=()
   echo -e "$BLUE Starting metadata and sleeping 5 $NC"
-  for server_node in $server_nodes; do
-    oarsh "$server_node" "cd engage && java -Xmx${xmx} -Xms${xms} \
-											-Dlog4j.configurationFile=config/log4j2.xml \
-											-DlogFilename=~/engage/logs/server${exp_path}/${nthreads}_${server_node}_metadata \
-											java -jar metadata-1.0-SNAPSHOT.jar mf_enabled=${mf_enabled}" 2>&1 | sed "s/^/[m-$server_node] /" &
+  for server_node in "${server_nodes[@]}"; do
+    oarsh "$server_node" "cd engage && java -Dlog4j.configurationFile=config/log4j2.xml \
+											-DlogFilename=/home/pfouto/engage/logs/server${exp_path}/${nthreads}_${server_node}_metadata \
+											-jar metadata-1.0-SNAPSHOT.jar mf_enabled=${mf_enabled}" 2>&1 | sed "s/^/[m-$server_node] /" &
     meta_pids+=($!)
   done
   sleep 5
 
-  #TODO only delete and recreate partitions on first client?
+  echo -e "$BLUE Deleting cassandra data $NC"
+  rm -rf /tmp/cass/"${OAR_JOB_ID}"
 
-  #TODO load data here, and keep it for all exps
+  echo -e "$BLUE Launching cassandra and sleeping 40 $NC"
+  unset cass_pids
+  cass_pids=()
+  for server_node in "${server_nodes[@]}"; do
+    oarsh "$server_node" "cd /tmp/cass/${OAR_JOB_ID} && bin/cassandra -f >/dev/null"  2>&1 | sed "s/^/[s-$server_node] /" &
+    cass_pids+=($!)
+  done
+
+  sleep 40
+
+  echo -e "$BLUE Loading data $NC"
+  unset client_pids
+  client_pids=()
+  i=0
+  for client_node in "${client_nodes[@]}"; do
+    server_node=${server_nodes[i]}
+    oarsh "$client_node" "cd engage && java -Dlog4j.configurationFile=log4j2_client.xml -cp engage-client.jar \
+          site.ycsb.Client -load -P workload -p localdc=$server_node -p engage.protocol=$alg -threads 1 \
+          > /dev/null" 2>&1 | sed "s/^/[c-$client_node] /" &
+    client_pids+=($!)
+    i=$((i + 1))
+  done
+  for pid in "${client_pids[@]}"; do
+    wait "$pid"
+    echo -n "${pid} "
+  done
+  echo -e "$BLUE All clients finished, waiting 20 more seconds $NC"
+
+  sleep 20
+
+  echo -e "$BLUE Killing cassandra $NC"
+  for server_node in "${server_nodes[@]}"; do
+    oarsh "$server_node" "kill \$(ps aux | grep -v 'grep' | grep 'CassandraDaemon' | awk '{print \$2}')" &
+  done
+
+  for pid in "${cass_pids[@]}"; do
+    echo -n "wait ${pid} "
+    wait $pid
+  done
+  echo "Servers Killed"
+
+  exit
 
   # ---------- RUN
   for run in $(seq "$start_run" $((n_runs + start_run - 1))); do
@@ -185,8 +228,6 @@ for alg in "${algslist[@]}"; do # ----------------------------------- ALG
 
       writes_per="$((100 - reads_per))"
       echo -e "$GREEN -- -- -- - ${NC}r:${reads_per} w:${writes_per}"
-
-      #TODO overwrite alg in cassandra config
 
       exp_path="${exp_name}/${reads_per}/${alg}/${run}"
 
@@ -256,7 +297,7 @@ for alg in "${algslist[@]}"; do # ----------------------------------- ALG
         #pkill --full metadata-1.0
         #kill $(ps aux | grep -v 'grep' | grep 'CassandraDaemon' | awk '{print $2}')
         for server_node in $server_nodes; do
-          oarsh "$server_node" "kill $(ps aux | grep -v 'grep' | grep 'CassandraDaemon' | awk '{print $2}')" &
+          oarsh "$server_node" "kill \$(ps aux | grep -v 'grep' | grep 'CassandraDaemon' | awk '{print \$2}')" &
         done
         wait
         for pid in ${cass_pids[@]}; do

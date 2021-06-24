@@ -1,7 +1,7 @@
 #!/bin/bash
 
-if [[ -z "$2" ]]; then
-  echo "Usage: setup_config.sh [nServers] [conf_file]"
+if [[ -z "$1" ]]; then
+  echo "Usage: config_nodes.sh [nServers]"
   exit
 fi
 
@@ -11,13 +11,10 @@ GREEN='\033[0;32m'
 NC='\033[0m' # No Color
 
 n_Servers=$1
-conf_file=$2
 
 all_nodes=$(./nodes.sh)
 
 declare -a server_nodes
-
-cp "$conf_file" "$HOME/engage/config/tree.json"
 
 idx=0
 for i in $all_nodes; do
@@ -35,5 +32,14 @@ fi
 
 for (( i=0; i<$n_Servers; i++ ))
 do
-  sed -i "s/\"node-$((i+1))\"/\"${server_nodes[$i]}\"/g" "$HOME/engage/config/tree.json"
+  oarsh "${server_nodes[$i]}" "sudo-g5k apt -y install libjemalloc-dev" &
 done
+wait
+echo "DONE installing libjemalloc"
+
+for (( i=0; i<$n_Servers; i++ ))
+do
+  oarsh "${server_nodes[$i]}" "sudo-g5k swapoff -a && sudo-g5k sysctl -w vm.max_map_count=1048575" &
+done
+wait
+echo "DONE disabling swap && setting max_map count"

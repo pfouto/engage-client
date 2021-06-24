@@ -23,7 +23,7 @@ fieldcount=1
 cassandra.readtimeoutmillis=10000
 cassandra.connecttimeoutmillis=10000
 
-recordcount=10000
+recordcount=100000
 operationcount=10000
 
 readproportion=0.5
@@ -36,5 +36,7 @@ engage.protocol=bayou
 engage.ops_local=95
 engage.ops_remote=5
 
+status.interval=10
+status=true
 
-
+measurementtype=hdrhistogram

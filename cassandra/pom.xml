@@ -18,7 +18,7 @@ LICENSE file.
 -->
 
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <groupId>site.ycsb</groupId>
@@ -61,11 +61,16 @@ LICENSE file.
       <classifier>shaded</classifier>
       <scope>test</scope>
     </dependency>
-    <dependency>
+    <!--dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-simple</artifactId>
       <version>1.7.21</version>
       <scope>compile</scope>
+    </dependency-->
+    <dependency>
+      <groupId>org.apache.logging.log4j</groupId>
+      <artifactId>log4j-slf4j-impl</artifactId>
+      <version>2.14.1</version>
     </dependency>
     <dependency>
       <groupId>junit</groupId>
@@ -74,13 +79,13 @@ LICENSE file.
       <scope>test</scope>
     </dependency>
     <!-- only for Cassandra test (Cassandra 2.2+ uses Sigar for collecting system information, and Sigar requires some native lib files) -->
-	  <dependency>
-	    <groupId>org.hyperic</groupId>
-	    <artifactId>sigar-dist</artifactId>
-	    <version>1.6.4.129</version>
-	    <type>zip</type>
-	    <scope>test</scope>
-	  </dependency>
+    <dependency>
+      <groupId>org.hyperic</groupId>
+      <artifactId>sigar-dist</artifactId>
+      <version>1.6.4.129</version>
+      <type>zip</type>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <profiles>
@@ -98,22 +103,22 @@ LICENSE file.
     </profile>
   </profiles>
   <!-- sigar-dist can be downloaded from jboss repository -->
-	<repositories>
-		<repository>
-			<id>central2</id>
-			<name>sigar Repository</name>
-			<url>https://repository.jboss.org/nexus/content/groups/public-jboss/</url>
-			<layout>default</layout>
-			<snapshots>
-				<enabled>false</enabled>
-			</snapshots>
-		</repository>
-	</repositories>
-	<!-- unzip sigar-dist/lib files. 
-		References: 
-		http://stackoverflow.com/questions/5388661/unzip-dependency-in-maven 
-		https://arviarya.wordpress.com/2013/09/22/sigar-access-operating-system-and-hardware-level-information/
-	 -->
+  <repositories>
+    <repository>
+      <id>central2</id>
+      <name>sigar Repository</name>
+      <url>https://repository.jboss.org/nexus/content/groups/public-jboss/</url>
+      <layout>default</layout>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+    </repository>
+  </repositories>
+  <!-- unzip sigar-dist/lib files.
+    References:
+    http://stackoverflow.com/questions/5388661/unzip-dependency-in-maven
+    https://arviarya.wordpress.com/2013/09/22/sigar-access-operating-system-and-hardware-level-information/
+   -->
   <build>
     <plugins>
       <plugin>

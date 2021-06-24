@@ -58,7 +58,7 @@ public class KeyspaceManager {
     local = true;
 
     r = new Random();
-    System.out.println(Thread.currentThread().getName() + " | Initial host " + currentHost);
+    //System.err.println("Initial host " + currentHost);
   }
 
   void addBlockingDepsCustomPayload(BoundStatement boundStmt) {

@@ -305,17 +305,15 @@ public final class Client {
 
     initWorkload(props, warningthread, workload, tracer);
 
-    System.err.println("Starting test.");
+    //System.err.println("Starting test.");
     final CountDownLatch completeLatch = new CountDownLatch(threadcount);
 
     final List<ClientThread> clients = initDb(dbname, props, threadcount, targetperthreadperms,
         workload, tracer, completeLatch);
 
     if (status) {
-      boolean standardstatus = false;
-      if (props.getProperty(Measurements.MEASUREMENT_TYPE_PROPERTY, "").compareTo("timeseries") == 0) {
-        standardstatus = true;
-      }
+      boolean standardstatus = true;
+
       int statusIntervalSeconds = Integer.parseInt(props.getProperty("status.interval", "10"));
       boolean trackJVMStats = props.getProperty(Measurements.MEASUREMENT_TRACK_JVM_PROPERTY,
           Measurements.MEASUREMENT_TRACK_JVM_PROPERTY_DEFAULT).equals("true");
@@ -506,13 +504,13 @@ public final class Client {
     try {
       Properties projectProp = new Properties();
       projectProp.load(classLoader.getResourceAsStream("project.properties"));
-      System.err.println("YCSB Client " + projectProp.getProperty("version"));
+      //System.err.println("YCSB Client " + projectProp.getProperty("version"));
     } catch (IOException e) {
       System.err.println("Unable to retrieve client version.");
     }
 
-    System.err.println();
-    System.err.println("Loading workload...");
+    //System.err.println();
+    //System.err.println("Loading workload...");
     try {
       Class workloadclass = classLoader.loadClass(props.getProperty(WORKLOAD_PROPERTY));
 
@@ -528,11 +526,11 @@ public final class Client {
 
   private static Properties parseArguments(String[] args) {
     Properties props = new Properties();
-    System.err.print("Command line:");
+    //System.err.print("Command line:");
     for (String arg : args) {
-      System.err.print(" " + arg);
+      //System.err.print(" " + arg);
     }
-    System.err.println();
+    //System.err.println();
 
     Properties fileprops = new Properties();
     int argindex = 0;

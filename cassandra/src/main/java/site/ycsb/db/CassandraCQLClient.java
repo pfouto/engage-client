@@ -36,6 +36,7 @@ public class CassandraCQLClient extends DB {
   public static final String TRACING_PROPERTY_DEFAULT = "false";
 
   private static final Logger logger = LoggerFactory.getLogger(CassandraCQLClient.class);
+
   //                                  Host:Partition, Statement
   private static final ConcurrentMap<String, PreparedStatement> readStmts = new ConcurrentHashMap<>();
   private static final ConcurrentMap<String, PreparedStatement> insertStmts = new ConcurrentHashMap<>();
@@ -98,10 +99,10 @@ public class CassandraCQLClient extends DB {
           localDC = getProperties().getProperty(LOCAL_DC_PROPERTY);
           if (localDC == null) {
             throw new DBException(String.format(
-                "Required property \"%s\" missing for CassandraCQLClient",
+                "Required property \"%s\" missing fkor CassandraCQLClient",
                 LOCAL_DC_PROPERTY));
           }
-          System.out.println("LocalDC: " + localDC);
+          System.err.println("LocalDC: " + localDC);
 
           //Read tree
           keyspacesRemote = new HashSet<>();
@@ -118,9 +119,9 @@ public class CassandraCQLClient extends DB {
               if (!keyspacesLocal.contains(ks)) keyspacesRemote.add(ks);
             });
           });
-          System.out.println("Local: " + keyspacesLocal);
-          System.out.println("Remote: " + keyspacesRemote);
-          System.out.println("All: " + hostsKeyspaces);
+          //System.out.println("Local: " + keyspacesLocal);
+          //System.out.println("Remote: " + keyspacesRemote);
+          //System.out.println("All: " + hostsKeyspaces);
 
           trace = Boolean.parseBoolean(getProperties().getProperty(TRACING_PROPERTY, TRACING_PROPERTY_DEFAULT));
 
@@ -155,10 +156,10 @@ public class CassandraCQLClient extends DB {
               cluster.getConfiguration().getSocketOptions().setReadTimeoutMillis(Integer.parseInt(readTimoutMillis));
             }
             Metadata metadata = cluster.getMetadata();
-            logger.info("Connected to cluster: {}\n", metadata.getClusterName());
+            //logger.info("Connected to cluster: {}\n", metadata.getClusterName());
             for (Host discoveredHost : metadata.getAllHosts()) {
-              logger.info("Datacenter: {}; Host: {}; Rack: {}\n",
-                  discoveredHost.getDatacenter(), discoveredHost.getEndPoint(), discoveredHost.getRack());
+              //logger.info("Datacenter: {}; Host: {}; Rack: {}\n",
+                  //discoveredHost.getDatacenter(), discoveredHost.getEndPoint(), discoveredHost.getRack());
             }
             Session session = cluster.connect();
 
