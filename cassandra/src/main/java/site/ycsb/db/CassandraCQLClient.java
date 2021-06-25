@@ -102,17 +102,20 @@ public class CassandraCQLClient extends DB {
                 "Required property \"%s\" missing for CassandraCQLClient",
                 LOCAL_DC_PROPERTY));
           }
-          System.err.println("LocalDC: " + localDC);
 
           //Read tree
           keyspacesRemote = new HashSet<>();
           keyspacesLocal = new ArrayList<>();
           hostsKeyspaces = new HashMap<>();
+
           BufferedReader reader = Files.newBufferedReader(Paths.get("config/tree.json"));
           Tree tree = new Gson().fromJson(reader, Tree.class);
           reader.close();
 
           keyspacesLocal.addAll(tree.getNodes().get(localDC).getPartitions());
+
+          System.err.println("LocalDC: " + localDC + " " + keyspacesLocal.get(0));
+
           tree.getNodes().forEach((h, pi) -> {
             hostsKeyspaces.put(h, new HashSet<>(pi.getPartitions()));
             pi.getPartitions().forEach(ks -> {

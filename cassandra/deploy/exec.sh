@@ -139,10 +139,14 @@ sleep 3
 
 #rm -rf /tmp/cass
 
-echo -e "$GREEN -- Waiting for compilation $NC"
+echo -e "$GREEN -- Rsync $NC"
 for server_node in "${server_nodes[@]}"; do
-  oarsh "$server_node" "mkdir -p /tmp/cass && rsync -arzP /home/pfouto/engage/cass/ /tmp/cass/${OAR_JOB_ID} \
-                                && cd /tmp/cass/${OAR_JOB_ID} && CASSANDRA_USE_JDK11=true ant > /dev/null" &
+  oarsh "$server_node" "mkdir -p /tmp/cass && rsync -arzP /home/pfouto/engage/cass/ /tmp/cass/${OAR_JOB_ID}" &
+done
+wait
+echo -e "$GREEN -- Compiling $NC"
+for server_node in "${server_nodes[@]}"; do
+  oarsh "$server_node" "cd /tmp/cass/${OAR_JOB_ID} && CASSANDRA_USE_JDK11=true ant" &
 done
 wait
 echo -e "$GREEN -- Compilation finished $NC"
@@ -151,6 +155,7 @@ for alg in "${algslist[@]}"; do # ----------------------------------- ALG
   echo -e "$GREEN -- -- -- -- -- -- STARTING ALG $NC$alg"
 
   mkdir -p ~/engage/logs/metadata/"${exp_name}"/"${alg}"
+  mkdir -p ~/engage/logs/server/"${exp_name}"/"${alg}"
 
   if [ "$alg" == "saturn" ]; then
     mf_enabled="false"
@@ -164,29 +169,33 @@ for alg in "${algslist[@]}"; do # ----------------------------------- ALG
     oarsh "$server_node" "sed -i \"s/^\(\s*protocol\s*:\s*\).*/\1'${alg}'/\"" /tmp/cass/"${OAR_JOB_ID}"/conf/cassandra.yaml
   done
 
+  echo -e "$BLUE Deleting cassandra data $NC"
+
+  for server_node in "${server_nodes[@]}"; do
+    oarsh "$server_node" "rm -rf /tmp/cass/${OAR_JOB_ID}/data/"
+  done
+
   unset meta_pids
   meta_pids=()
-  echo -e "$BLUE Starting metadata and sleeping 5 $NC"
+  echo -e "$BLUE Starting metadata and sleeping 4 $NC"
   for server_node in "${server_nodes[@]}"; do
     oarsh "$server_node" "cd engage && java -Dlog4j.configurationFile=config/log4j2.xml \
 											-DlogFilename=/home/pfouto/engage/logs/metadata/${exp_name}/${alg}/${server_node}_metadata \
 											-jar metadata-1.0-SNAPSHOT.jar mf_enabled=${mf_enabled}" 2>&1 | sed "s/^/[m-$server_node] /" &
     meta_pids+=($!)
   done
-  sleep 5
+  sleep 4
 
-  echo -e "$BLUE Deleting cassandra data $NC"
-  rm -rf /tmp/cass/"${OAR_JOB_ID}"
-
-  echo -e "$BLUE Launching cassandra and sleeping 60 $NC"
+  echo -e "$BLUE Launching cassandra and sleeping 70 $NC"
   unset cass_pids
   cass_pids=()
   for server_node in "${server_nodes[@]}"; do
-    oarsh "$server_node" "cd /tmp/cass/${OAR_JOB_ID} && bin/cassandra -f >/dev/null" 2>&1 | sed "s/^/[s-$server_node] /" &
+    oarsh "$server_node" "cd /tmp/cass/${OAR_JOB_ID} && bin/cassandra \
+    -DlogFilename=/home/pfouto/engage/logs/server/${exp_name}/${alg}/load_${server_node} -f >/dev/null" 2>&1 | sed "s/^/[s-$server_node] /" &
     cass_pids+=($!)
   done
 
-  sleep 60
+  sleep 70
 
   echo -e "$BLUE Loading data $NC"
   unset client_pids
@@ -195,14 +204,19 @@ for alg in "${algslist[@]}"; do # ----------------------------------- ALG
   for client_node in "${client_nodes[@]}"; do
     server_node=${server_nodes[i]}
     oarsh "$client_node" "cd engage && java -Dlog4j.configurationFile=log4j2_client.xml -cp engage-client.jar \
-          site.ycsb.Client -load -P workload -p localdc=$server_node -p engage.protocol=$alg -threads 1 \
+          site.ycsb.Client -load -P workload -p localdc=$server_node -p engage.protocol=$alg -p measurementtype=histogram -threads 10 \
           > /dev/null" 2>&1 | sed "s/^/[c-$client_node] /" &
     client_pids+=($!)
     i=$((i + 1))
   done
+  server_node=${server_nodes[i]}
+  oarsh "$client_node" "cd engage && java -Dlog4j.configurationFile=log4j2_client.xml -cp engage-client.jar \
+          site.ycsb.Client -load -P workload -p localdc=$server_node -p engage.protocol=$alg -threads 1 \
+          > /dev/null" 2>&1 | sed "s/^/[c-$client_node] /" &
+  client_pids+=($!)
+
   for pid in "${client_pids[@]}"; do
     wait "$pid"
-    echo -n "${pid} "
   done
   echo -e "$BLUE All clients finished, waiting 20 more seconds $NC"
 
@@ -214,10 +228,9 @@ for alg in "${algslist[@]}"; do # ----------------------------------- ALG
   done
 
   for pid in "${cass_pids[@]}"; do
-    echo -n "wait ${pid} "
-    wait $pid
+    wait "$pid"
   done
-  echo "Servers Killed"
+  echo -e "$BLUE Servers Killed $NC"
 
   # ---------- RUN
   for run in $(seq "$start_run" $((n_runs + start_run - 1))); do
@@ -243,18 +256,19 @@ for alg in "${algslist[@]}"; do # ----------------------------------- ALG
 
         ((current_run = current_run + 1))
         echo -e "$GREEN RUN ${current_run}/${total_runs} - ($(((current_run - 1) * 100 / total_runs))%) ($start_date) $NC"
-        sleep 6
+        sleep 2
 
         echo -e "$BLUE Starting cassandra and sleeping 15 $NC"
         unset cass_pids
         cass_pids=()
         for server_node in "${server_nodes[@]}"; do
-          oarsh "$server_node" "cd /tmp/cass/${OAR_JOB_ID} && bin/cassandra -f >/dev/null" 2>&1 | sed "s/^/[s-$server_node] /" &
+          oarsh "$server_node" "cd /tmp/cass/${OAR_JOB_ID} && bin/cassandra \
+          -DlogFilename=/home/pfouto/engage/logs/server/${exp_path}/${nthreads}_${server_node} -f > /dev/null" 2>&1 | sed "s/^/[s-$server_node] /" &
           cass_pids+=($!)
         done
         sleep 15
 
-        echo "Starting clients and sleeping 70"
+        echo "Starting clients and sleeping 80"
         unset client_pids
         client_pids=()
         i=0
@@ -262,20 +276,19 @@ for alg in "${algslist[@]}"; do # ----------------------------------- ALG
           server_node=${server_nodes[i]}
           oarsh "$client_node" "cd engage && java -Dlog4j.configurationFile=log4j2_client.xml -cp engage-client.jar \
           site.ycsb.Client -P workload -p localdc=$server_node -p engage.protocol=$alg \
-          -p readproportion=${reads_per} -p updateproportion=${writes_per} -threads 1 \
+          -p readproportion=${reads_per} -p updateproportion=${writes_per} -threads ${nthreads} \
           > /home/pfouto/engage/logs/client/${exp_path}/${nthreads}_${client_node}" 2>&1 | sed "s/^/[c-$client_node] /" &
           client_pids+=($!)
           i=$((i + 1))
         done
-        sleep 70
+        sleep 80
 
         echo "Killing clients"
         for client_node in "${client_nodes[@]}"; do
           oarsh "$client_node" "pkill java" &
         done
-        wait
-        for pid in ${client_pids[@]}; do
-          wait $pid
+        for pid in "${client_pids[@]}"; do
+          wait "$pid"
           echo -n "${pid} "
         done
         echo "Clients Killed"
@@ -288,7 +301,7 @@ for alg in "${algslist[@]}"; do # ----------------------------------- ALG
 
         for pid in "${cass_pids[@]}"; do
           echo -n "wait ${pid} "
-          wait $pid
+          wait "$pid"
         done
         echo "Servers Killed"
         sleep 1
@@ -301,9 +314,8 @@ for alg in "${algslist[@]}"; do # ----------------------------------- ALG
   for server_node in "${server_nodes[@]}"; do
     oarsh "$server_node" "pkill --full metadata-1.0" &
   done
-  wait
-  for pid in ${meta_pids[@]}; do
-    wait $pid
+  for pid in "${meta_pids[@]}"; do
+    wait "$pid"
     echo -n "${pid} "
   done
   echo "Metadata Killed"

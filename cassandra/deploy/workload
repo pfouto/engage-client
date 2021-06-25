@@ -20,11 +20,11 @@ insertorder=ordered
 requestdistribution=zipfian
 fieldcount=1
 
-cassandra.readtimeoutmillis=10000
-cassandra.connecttimeoutmillis=10000
+cassandra.readtimeoutmillis=40000
+cassandra.connecttimeoutmillis=40000
 
 recordcount=100000
-operationcount=10000
+operationcount=1000000
 
 readproportion=0.5
 updateproportion=0.5

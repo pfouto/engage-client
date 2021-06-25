@@ -5,10 +5,10 @@ import java.util.Map;
 
 public class Tree {
 
-  private final Map<String, PartitionInfo> nodes;
+  private final Map<String, NodeInfo> nodes;
   private final List<List<String>> links;
 
-  public Tree(Map<String, PartitionInfo> nodes, List<List<String>> links) {
+  public Tree(Map<String, NodeInfo> nodes, List<List<String>> links) {
     this.nodes = nodes;
     this.links = links;
   }
@@ -17,7 +17,7 @@ public class Tree {
     return links;
   }
 
-  public Map<String, PartitionInfo> getNodes() {
+  public Map<String, NodeInfo> getNodes() {
     return nodes;
   }
 }

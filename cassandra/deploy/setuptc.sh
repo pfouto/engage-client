@@ -34,12 +34,12 @@ echo -e "${GREEN}Servers: $NC${server_nodes[*]}"
 
 echo Setting up TC...
 
-cmd1="sudo-g5k sudo ip link set eno2 down"
-for ((i = 0; i < $(($n_Servers)); i++)); do
-  echo "${server_nodes[$i]} -- $cmd1"
-  oarsh "${server_nodes[$i]}" "$cmd1" &
-done
-wait
+#cmd1="sudo-g5k sudo ip link set eno2 down"
+#for ((i = 0; i < $(($n_Servers)); i++)); do
+#  echo "${server_nodes[$i]} -- $cmd1"
+#  oarsh "${server_nodes[$i]}" "$cmd1" &
+#done
+#wait
 
 for ((i = 0; i < $(($n_Servers)); i++)); do
   cmd="sudo-g5k tc qdisc del dev br0 root"
