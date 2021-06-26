@@ -204,14 +204,14 @@ for alg in "${algslist[@]}"; do # ----------------------------------- ALG
   for client_node in "${client_nodes[@]}"; do
     server_node=${server_nodes[i]}
     oarsh "$client_node" "cd engage && java -Dlog4j.configurationFile=log4j2_client.xml -cp engage-client.jar \
-          site.ycsb.Client -load -P workload -p localdc=$server_node -p engage.protocol=$alg -p measurementtype=histogram -threads 10 \
+          site.ycsb.Client -load -P workload -p localdc=$server_node -p engage.protocol=$alg -p measurementtype=timeseries -threads 10 \
           > /dev/null" 2>&1 | sed "s/^/[c-$client_node] /" &
     client_pids+=($!)
     i=$((i + 1))
   done
   server_node=${server_nodes[i]}
   oarsh "$client_node" "cd engage && java -Dlog4j.configurationFile=log4j2_client.xml -cp engage-client.jar \
-          site.ycsb.Client -load -P workload -p localdc=$server_node -p engage.protocol=$alg -threads 1 \
+          site.ycsb.Client -load -P workload -p localdc=$server_node -p engage.protocol=$alg -p measurementtype=timeseries -threads 10 \
           > /dev/null" 2>&1 | sed "s/^/[c-$client_node] /" &
   client_pids+=($!)
 
@@ -268,7 +268,7 @@ for alg in "${algslist[@]}"; do # ----------------------------------- ALG
         done
         sleep 15
 
-        echo "Starting clients and sleeping 80"
+        echo -e "$BLUE Starting clients and sleeping 80 $NC"
         unset client_pids
         client_pids=()
         i=0
@@ -283,34 +283,32 @@ for alg in "${algslist[@]}"; do # ----------------------------------- ALG
         done
         sleep 80
 
-        echo "Killing clients"
+        echo -e "$BLUE Killing clients $NC"
         for client_node in "${client_nodes[@]}"; do
           oarsh "$client_node" "pkill java" &
         done
         for pid in "${client_pids[@]}"; do
           wait "$pid"
-          echo -n "${pid} "
         done
-        echo "Clients Killed"
+        echo -e "$BLUE Clients killed $NC"
         sleep 20
 
-        echo "Killing servers"
+        echo -e "$BLUE Killing servers $NC"
         for server_node in "${server_nodes[@]}"; do
           oarsh "$server_node" "kill \$(ps aux | grep -v 'grep' | grep 'CassandraDaemon' | awk '{print \$2}')" &
         done
 
         for pid in "${cass_pids[@]}"; do
-          echo -n "wait ${pid} "
           wait "$pid"
         done
-        echo "Servers Killed"
+        echo -e "$BLUE Servers killed $NC"
         sleep 1
 
       done #nthreads
     done #reads_per
   done #run
 
-  echo "Killing metadata"
+  echo -e "$BLUE Killing metadata $NC"
   for server_node in "${server_nodes[@]}"; do
     oarsh "$server_node" "pkill --full metadata-1.0" &
   done
@@ -318,7 +316,7 @@ for alg in "${algslist[@]}"; do # ----------------------------------- ALG
     wait "$pid"
     echo -n "${pid} "
   done
-  echo "Metadata Killed"
+  echo -e "$BLUE Metadata killed $NC"
   sleep 1
 done #alg
 echo -e "$BLUE -- -- -- -- -- -- -- -- All tests completed $NC"

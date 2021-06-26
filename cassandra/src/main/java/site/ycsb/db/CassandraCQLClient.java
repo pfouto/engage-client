@@ -249,7 +249,8 @@ public class CassandraCQLClient extends DB {
       ksManager.incorporateWriteMigrateResponse(execute);
 
     } catch (Exception e) {
-      logger.error(MessageFormatter.format("Error updating key: {}", key).getMessage(), e);
+      System.err.println("ERROR MIGRATING: " + e);
+      logger.error("Error migrating: {} {}", host, e);
     }
   }
 
@@ -335,8 +336,8 @@ public class CassandraCQLClient extends DB {
       return Status.OK;
 
     } catch (Exception e) {
-      System.out.println("ERROR: " + e);
-      logger.error(MessageFormatter.format("Error reading key: {}", key).getMessage(), e);
+      System.err.println("ERROR READ: " + e);
+      logger.error("Error reading key: {} {}", key, e);
       return Status.ERROR;
     }
 
@@ -418,7 +419,8 @@ public class CassandraCQLClient extends DB {
 
       return Status.OK;
     } catch (Exception e) {
-      logger.error(MessageFormatter.format("Error updating key: {}", key).getMessage(), e);
+      System.err.println("ERROR UPDATE: " + e);
+      logger.error("Error updating key: {} {}", key, e);
     }
     return Status.ERROR;
   }
@@ -493,7 +495,8 @@ public class CassandraCQLClient extends DB {
       return Status.OK;
 
     } catch (Exception e) {
-      logger.error(MessageFormatter.format("Error inserting key: {}", key).getMessage(), e);
+      System.err.println("ERROR INSERT: " + e);
+      logger.error("Error inserting key: {} {}", key, e);
     }
     return Status.ERROR;
   }
