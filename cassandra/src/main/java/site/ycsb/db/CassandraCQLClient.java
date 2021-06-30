@@ -108,7 +108,8 @@ public class CassandraCQLClient extends DB {
           keyspacesLocal = new ArrayList<>();
           hostsKeyspaces = new HashMap<>();
 
-          BufferedReader reader = Files.newBufferedReader(Paths.get("config/tree.json"));
+          String treeFile = getProperties().getProperty("engage.tree_file");
+          BufferedReader reader = Files.newBufferedReader(Paths.get(treeFile));
           Tree tree = new Gson().fromJson(reader, Tree.class);
           reader.close();
 

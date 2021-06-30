@@ -19,6 +19,7 @@ scanproportion=0
 insertorder=ordered
 requestdistribution=zipfian
 fieldcount=1
+fieldlength=1024
 
 cassandra.readtimeoutmillis=40000
 cassandra.connecttimeoutmillis=40000
@@ -32,9 +33,10 @@ updateproportion=0.5
 engage.migration_enabled=true
 engage.session_guarantees=CAUSAL
 engage.protocol=bayou
-
 engage.ops_local=95
 engage.ops_remote=5
+
+engage.tree_file=PLACEHOLDER
 
 status.interval=10
 status=true
