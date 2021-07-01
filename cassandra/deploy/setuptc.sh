@@ -53,7 +53,6 @@ while read -r raw_line; do
     echo "Ignored"
     continue
   fi
-  print_and_exec "${nodes[$i]}" "sudo-g5k tc qdisc del dev br0 root; sudo-g5k tc qdisc add dev br0 root handle 1: htb"
   j=0
   IFS=', ' read -r -a line <<<"$raw_line"
 
@@ -64,24 +63,20 @@ while read -r raw_line; do
   fi
 
   if [ "${download}" -ne "0" ]; then
+
     echo -e "${BLUE}DOWNLOAD $download$NC"
-    cmd="sudo-g5k modprobe ifb numifbs=1"
-    print_and_exec "${nodes[$i]}" "$cmd"
-    cmd="sudo-g5k ip link add ifb0 type ifb"
-    print_and_exec "${nodes[$i]}" "$cmd"
-    cmd="sudo-g5k ip link set dev ifb0 up"
-    print_and_exec "${nodes[$i]}" "$cmd"
-    cmd="sudo-g5k tc qdisc add dev br0 handle ffff: ingress"
-    print_and_exec "${nodes[$i]}" "$cmd"
-    cmd="sudo-g5k tc filter add dev br0 parent ffff: protocol ip u32 match u32 0 0 action mirred egress redirect dev ifb0"
-    print_and_exec "${nodes[$i]}" "$cmd"
-    cmd="sudo-g5k tc qdisc add dev ifb0 root handle 1: htb default 1"
-    print_and_exec "${nodes[$i]}" "$cmd"
-    cmd="sudo-g5k tc class add dev ifb0 parent 1: classid 1:1 htb rate ${download}mbit"
-    print_and_exec "${nodes[$i]}" "$cmd"
+    print_and_exec "${nodes[$i]}" "sudo-g5k modprobe ifb numifbs=1"
+    print_and_exec "${nodes[$i]}" "sudo-g5k ip link add ifb0 type ifb"
+    print_and_exec "${nodes[$i]}" "sudo-g5k ip link set dev ifb0 up"
+    print_and_exec "${nodes[$i]}" "sudo-g5k tc qdisc add dev br0 handle ffff: ingress"
+    print_and_exec "${nodes[$i]}" "sudo-g5k tc filter add dev br0 parent ffff: protocol ip u32 match u32 0 0 action mirred egress redirect dev ifb0"
+    print_and_exec "${nodes[$i]}" "sudo-g5k tc qdisc del dev ifb0 root"
+    print_and_exec "${nodes[$i]}" "sudo-g5k tc qdisc add dev ifb0 root handle 1: htb default 1"
+    print_and_exec "${nodes[$i]}" "sudo-g5k tc class add dev ifb0 parent 1: classid 1:1 htb rate ${download}mbit"
   fi
 
   echo -e "${BLUE}UPLOAD $upload$NC"
+  print_and_exec "${nodes[$i]}" "sudo-g5k tc qdisc del dev br0 root; sudo-g5k tc qdisc add dev br0 root handle 1: htb"
   cmd="sudo-g5k tc class add dev br0 parent 1: classid 1:1 htb rate ${upload}mbit"
   print_and_exec "${nodes[$i]}" "$cmd"
   for n in "${line[@]:2}"; do

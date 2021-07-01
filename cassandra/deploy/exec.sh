@@ -315,7 +315,7 @@ for alg in "${algslist[@]}"; do # ----------------------------------- ALG
         done
         sleep 30
 
-        echo -e "$BLUE Starting clients and sleeping 80 $NC"
+        echo -e "$BLUE Starting clients and sleeping 90 $NC"
         unset client_pids
         client_pids=()
         i=0
@@ -323,12 +323,12 @@ for alg in "${algslist[@]}"; do # ----------------------------------- ALG
           server_node=${server_nodes[i]}
           oarsh "$client_node" "cd engage && java -Dlog4j.configurationFile=log4j2_client.xml -cp engage-client.jar \
           site.ycsb.Client -P workload -p localdc=$server_node -p engage.protocol=$alg -p readproportion=${reads_per} \
-          -p updateproportion=${writes_per} -threads ${nthreads} -p engage.tree_file=tree_${OAR_JOB_ID}.json
+          -p updateproportion=${writes_per} -threads ${nthreads} -p engage.tree_file=tree_${OAR_JOB_ID}.json \
           > /home/pfouto/engage/logs/client/${exp_path}/${nthreads}_${client_node}" 2>&1 | sed "s/^/[c-$client_node] /" &
           client_pids+=($!)
           i=$((i + 1))
         done
-        sleep 80
+        sleep 90
 
         echo -e "$BLUE Killing clients $NC"
         for client_node in "${client_nodes[@]}"; do
