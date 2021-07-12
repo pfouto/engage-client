@@ -8,7 +8,6 @@ import com.datastax.driver.core.querybuilder.Update;
 import com.google.gson.Gson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.slf4j.helpers.MessageFormatter;
 import site.ycsb.*;
 
 import java.io.BufferedReader;
@@ -64,6 +63,7 @@ public class CassandraCQLClient extends DB {
   private static int nOpsRemote;
   private static String localDC;
   private static boolean migrate;
+  private static KsManager ksManagerType;
 
   //Per client thread
   private KeyspaceManager ksManager;
@@ -95,6 +95,7 @@ public class CassandraCQLClient extends DB {
           nOpsLocal = Integer.parseInt(getProperties().getProperty("engage.ops_local"));
           nOpsRemote = Integer.parseInt(getProperties().getProperty("engage.ops_remote"));
           migrate = Boolean.parseBoolean(getProperties().getProperty("engage.migration_enabled"));
+          ksManagerType = KsManager.valueOf(getProperties().getProperty("engage.ksmanager"));
 
           localDC = getProperties().getProperty(LOCAL_DC_PROPERTY);
           if (localDC == null) {
@@ -138,7 +139,13 @@ public class CassandraCQLClient extends DB {
               getProperties().getProperty(WRITE_CONSISTENCY_LEVEL_PROPERTY,
                   WRITE_CONSISTENCY_LEVEL_PROPERTY_DEFAULT));
 
-          for (String host : hostsKeyspaces.keySet()) {
+          Set<String> hostsToConnect = null;
+          if(ksManagerType == KsManager.regular) {
+            hostsToConnect = hostsKeyspaces.keySet();
+          } else if (ksManagerType == KsManager.visibility){
+            hostsToConnect = Set.of(localDC);
+          }
+          for (String host : hostsToConnect) {
             Cluster cluster = Cluster.builder().withPort(Integer.parseInt(port))
                 .addContactPoints(host).build();
             String maxConnections = getProperties().getProperty(MAX_CONNECTIONS_PROPERTY);
@@ -174,8 +181,12 @@ public class CassandraCQLClient extends DB {
 
         }
       } // synchronized
-      ksManager = new KeyspaceManager(localDC, keyspacesLocal, keyspacesRemote,
-          hostsKeyspaces, nOpsLocal, nOpsRemote, protocol, guarantees);
+      if(ksManagerType == KsManager.regular) {
+        ksManager = new KeyspaceManagerRegular(localDC, keyspacesLocal, keyspacesRemote,
+            hostsKeyspaces, nOpsLocal, nOpsRemote, protocol, guarantees);
+      } else if (ksManagerType == KsManager.visibility){
+        ksManager = new KeyspaceManagerVisib(localDC, keyspacesLocal, protocol, guarantees);
+      }
     } catch (Exception e) {
       throw new DBException(e);
     }
@@ -504,12 +515,16 @@ public class CassandraCQLClient extends DB {
 
   @Override
   public Status scan(String t, String sk, int rc, Set<String> f, Vector<HashMap<String, ByteIterator>> r) {
-    throw new AssertionError("Delete not implemented");
+    throw new AssertionError("Scan not implemented");
   }
 
   @Override
   public Status delete(String table, String key) {
     throw new AssertionError("Delete not implemented");
+  }
+
+  private enum KsManager {
+    regular, visibility;
   }
 
 }
