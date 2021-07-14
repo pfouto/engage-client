@@ -54,8 +54,8 @@ while [[ $# -gt 0 ]]; do
     shift # past argument
     shift # past value
     ;;
-  --targets)
-    targets_arg="$2"
+  --threads)
+    threads_arg="$2"
     shift # past argument
     shift # past value
     ;;
@@ -92,8 +92,8 @@ if [[ -z "${reads_arg}" ]]; then
   echo "reads_per not set"
   exit
 fi
-if [[ -z "${targets_arg}" ]]; then
-  echo "targets not set"
+if [[ -z "${threads_arg}" ]]; then
+  echo "threads not set"
   exit
 fi
 if [[ -z "${tree_file}" ]]; then
@@ -115,9 +115,9 @@ mapfile -t server_nodes < <(head -n "$n_servers" <<<"$all_nodes")
 
 IFS=', ' read -r -a algslist <<<"$algs_arg"
 IFS=', ' read -r -a readslist <<<"$reads_arg"
-IFS=', ' read -r -a targetslist <<<"$targets_arg"
+IFS=', ' read -r -a threadslist <<<"$threads_arg"
 
-total_runs=$((n_runs * ${#algslist[@]} * ${#readslist[@]} * ${#targetslist[@]}))
+total_runs=$((n_runs * ${#algslist[@]} * ${#readslist[@]} * ${#threadslist[@]}))
 
 echo -e "$GREEN -- Rsync $NC"
 for server_node in "${server_nodes[@]}"; do
@@ -154,7 +154,7 @@ echo -e "$GREEN n_runs: $NC ${n_runs}"
 echo -e "$GREEN start_run: $NC ${start_run}"
 echo -e "$GREEN reads percent: $NC ${readslist[*]}"
 echo -e "$GREEN algs: $NC ${algslist[*]}"
-echo -e "$GREEN targets: $NC ${targetslist[*]}"
+echo -e "$GREEN n threads: $NC ${threadslist[*]}"
 echo -e "$GREEN ---------- $NC"
 echo -e "$GREEN number of runs: $NC${total_runs}"
 echo -e "$BLUE ---- END CONFIG ---- \n $NC"
@@ -175,19 +175,18 @@ sleep 2
 
 # ----------------------------------- START EXP -------------------------------
 
-echo -e "$BLUE Setting log visibility to true in cassandra.yaml $NC"
-for server_node in "${server_nodes[@]}"; do
-  oarsh "$server_node" "sed -i \"s/^\(\s*log_visibility\s*:\s*\).*/\1'true'/\"" /tmp/cass/"${OAR_JOB_ID}"/conf/cassandra.yaml
-done
+  echo -e "$BLUE Setting log visibility to false in cassandra.yaml $NC"
+  for server_node in "${server_nodes[@]}"; do
+    oarsh "$server_node" "sed -i \"s/^\(\s*log_visibility\s*:\s*\).*/\1'false'/\"" /tmp/cass/"${OAR_JOB_ID}"/conf/cassandra.yaml
+  done
 
-records=1000
 #rm -rf /tmp/cass
 
 for alg in "${algslist[@]}"; do # ----------------------------------- ALG
   echo -e "$GREEN -- -- -- -- -- -- STARTING ALG $NC$alg"
 
-  mkdir -p ~/engage/logs/metadata/"${exp_name}"/"${alg}"
-  mkdir -p ~/engage/logs/server/"${exp_name}"/"${alg}"
+  mkdir -p ~/engage/logs/perf/metadata/"${exp_name}"/"${alg}"
+  mkdir -p ~/engage/logs/perf/server/"${exp_name}"/"${alg}"
 
   if [ "$alg" == "saturn" ]; then
     mf_enabled="false"
@@ -210,7 +209,7 @@ for alg in "${algslist[@]}"; do # ----------------------------------- ALG
   meta_pids=()
   for server_node in "${server_nodes[@]}"; do
     oarsh "$server_node" "cd engage && java -Dlog4j.configurationFile=config/log4j2.xml \
-											-DlogFilename=/home/pfouto/engage/logs/metadata/${exp_name}/${alg}/${server_node}_metadata \
+											-DlogFilename=/home/pfouto/engage/logs/perf/metadata/${exp_name}/${alg}/${server_node}_metadata \
 											-jar metadata-1.0-SNAPSHOT.jar mf_enabled=${mf_enabled} \
 											tree_file=tree_${OAR_JOB_ID}.json" 2>&1 | sed "s/^/[m-$server_node] /" &
     meta_pids+=($!)
@@ -221,8 +220,8 @@ for alg in "${algslist[@]}"; do # ----------------------------------- ALG
   unset cass_pids
   cass_pids=()
   for server_node in "${server_nodes[@]}"; do
-    oarsh "$server_node" "cd /tmp/cass/${OAR_JOB_ID} && mkdir -p results && bin/cassandra \
-    -DlogFilename=/tmp/cass/${OAR_JOB_ID}/results/${exp_name}/${alg}/load_${server_node} -f >/dev/null" 2>&1 | sed "s/^/[s-$server_node] /" &
+    oarsh "$server_node" "cd /tmp/cass/${OAR_JOB_ID} && bin/cassandra \
+    -DlogFilename=/home/pfouto/engage/logs/perf/server/${exp_name}/${alg}/load_${server_node} -f >/dev/null" 2>&1 | sed "s/^/[s-$server_node] /" &
     cass_pids+=($!)
   done
   sleep 70
@@ -235,11 +234,18 @@ for alg in "${algslist[@]}"; do # ----------------------------------- ALG
     server_node=${server_nodes[i]}
     oarsh "$client_node" "cd engage && java -Dlog4j.configurationFile=log4j2_client.xml -cp engage-client.jar \
           site.ycsb.Client -load -P workload -p localdc=$server_node -p engage.protocol=$alg -p measurementtype=timeseries \
-          -p engage.ksmanager=visibility -p engage.tree_file=tree_${OAR_JOB_ID}.json -p recordcount=$records \
+          -p engage.ksmanager=regular -p engage.tree_file=tree_${OAR_JOB_ID}.json \
           -threads 500 > /dev/null" 2>&1 | sed "s/^/[c-$client_node] /" &
     client_pids+=($!)
     i=$((i + 1))
   done
+  server_node=${server_nodes[i]}
+  oarsh "localhost" "cd engage && java -Dlog4j.configurationFile=log4j2_client.xml -cp engage-client.jar \
+          site.ycsb.Client -load -P workload -p localdc=$server_node -p engage.protocol=$alg -p measurementtype=timeseries \
+          -p engage.ksmanager=regular -p engage.tree_file=tree_${OAR_JOB_ID}.json \
+          -threads 500 > /dev/null" 2>&1 | sed "s/^/[c-$client_node] /" &
+  client_pids+=($!)
+
   for pid in "${client_pids[@]}"; do
     wait "$pid"
   done
@@ -283,15 +289,15 @@ for alg in "${algslist[@]}"; do # ----------------------------------- ALG
 
       exp_path="${exp_name}/${alg}/${reads_per}/${run}"
 
-      mkdir -p ~/engage/logs/client/"${exp_path}"
-      mkdir -p ~/engage/logs/server/"${exp_path}"
+      mkdir -p ~/engage/logs/perf/client/"${exp_path}"
+      mkdir -p ~/engage/logs/perf/server/"${exp_path}"
 
-      for target in "${targetslist[@]}"; do # -------------------- TARGET
-        echo -e "$GREEN -- -- -- -- -- -- -- -- STARTING TARGET $NC$target"
-        echo -e "$GREEN -- -- -- -- -- -- -- -- - $NC$exp_path/$target"
+      for nthreads in "${threadslist[@]}"; do # -------------------- N_THREADS
+        echo -e "$GREEN -- -- -- -- -- -- -- -- STARTING THREADS $NC$nthreads"
+        echo -e "$GREEN -- -- -- -- -- -- -- -- - $NC$exp_path/$nthreads"
 
-        rm -r ~/engage/logs/client/"${exp_path}"/"${target}"_*
-        rm -r ~/engage/logs/server/"${exp_path}"/"${target}"_*
+        rm -r ~/engage/logs/perf/client/"${exp_path}"/"${nthreads}"_*
+        rm -r ~/engage/logs/perf/server/"${exp_path}"/"${nthreads}"_*
 
         ((current_run = current_run + 1))
         echo -e "$GREEN RUN ${current_run}/${total_runs} - ($(((current_run - 1) * 100 / total_runs))%) ($start_date) $NC"
@@ -313,8 +319,7 @@ for alg in "${algslist[@]}"; do # ----------------------------------- ALG
         cass_pids=()
         for server_node in "${server_nodes[@]}"; do
           oarsh "$server_node" "cd /tmp/cass/${OAR_JOB_ID} && bin/cassandra \
-          -DlogFilename=/tmp/cass/${OAR_JOB_ID}/results/${exp_path}/${target}_${server_node} \
-          -f > /dev/null" 2>&1 | sed "s/^/[s-$server_node] /" &
+          -DlogFilename=/home/pfouto/engage/logs/perf/server/${exp_path}/${nthreads}_${server_node} -f > /dev/null" 2>&1 | sed "s/^/[s-$server_node] /" &
           cass_pids+=($!)
         done
         sleep 30
@@ -327,9 +332,9 @@ for alg in "${algslist[@]}"; do # ----------------------------------- ALG
           server_node=${server_nodes[i]}
           oarsh "$client_node" "cd engage && java -Dlog4j.configurationFile=log4j2_client.xml -cp engage-client.jar \
           site.ycsb.Client -P workload -p localdc=$server_node -p engage.protocol=$alg -p readproportion=${reads_per} \
-          -p updateproportion=${writes_per} -threads 50 -p engage.tree_file=tree_${OAR_JOB_ID}.json \
-          -p engage.ksmanager=visibility -p recordcount=$records -target $target \
-          > /home/pfouto/engage/logs/client/${exp_path}/${target}_${client_node}" 2>&1 | sed "s/^/[c-$client_node] /" &
+          -p updateproportion=${writes_per} -threads ${nthreads} -p engage.tree_file=tree_${OAR_JOB_ID}.json \
+          -p engage.ksmanager=regular \
+          > /home/pfouto/engage/logs/perf/client/${exp_path}/${nthreads}_${client_node}" 2>&1 | sed "s/^/[c-$client_node] /" &
           client_pids+=($!)
           i=$((i + 1))
         done
@@ -356,7 +361,7 @@ for alg in "${algslist[@]}"; do # ----------------------------------- ALG
         echo -e "$BLUE Servers killed $NC"
         sleep 1
 
-      done #target
+      done #nthreads
     done #reads_per
   done #run
 
@@ -372,9 +377,7 @@ for alg in "${algslist[@]}"; do # ----------------------------------- ALG
   sleep 1
 done #alg
 echo -e "$BLUE -- -- -- -- -- -- -- -- All tests completed $NC"
-echo "Getting logs"
-for server_node in "${server_nodes[@]}"; do
-  oarsh "$server_node" "cp -r /tmp/cass/${OAR_JOB_ID}/results/* /home/pfouto/engage/logs/server/" &
-done
-wait
+echo "Deleting tree file"
+rm "$HOME/engage/tree_${OAR_JOB_ID}.json"
+
 exit
