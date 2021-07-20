@@ -235,7 +235,7 @@ for alg in "${algslist[@]}"; do # ----------------------------------- ALG
     server_node=${server_nodes[i]}
     oarsh "$client_node" "cd engage && java -Dlog4j.configurationFile=log4j2_client.xml -cp engage-client.jar \
           site.ycsb.Client -load -P workload -p localdc=$server_node -p engage.protocol=$alg -p measurementtype=timeseries \
-          -p engage.ksmanager=visibility -p engage.tree_file=tree_${OAR_JOB_ID}.json -p recordcount=$records \
+          -p engage.ksmanager=visibility -p engage.tree_file=tree_${OAR_JOB_ID}.json \
           -threads 500 > /dev/null" 2>&1 | sed "s/^/[c-$client_node] /" &
     client_pids+=($!)
     i=$((i + 1))
@@ -245,7 +245,7 @@ for alg in "${algslist[@]}"; do # ----------------------------------- ALG
   done
   echo -e "$BLUE All clients finished $NC"
 
-  sleep 5
+  sleep 30
 
   echo -e "$BLUE Killing cassandra $NC"
   for server_node in "${server_nodes[@]}"; do
