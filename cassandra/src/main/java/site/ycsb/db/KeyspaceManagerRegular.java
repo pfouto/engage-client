@@ -44,7 +44,7 @@ public class KeyspaceManagerRegular implements KeyspaceManager {
     this.hostsKeyspaces = hostsKeyspaces;
     this.nOpsLocal = nOpsLocal;
     this.nOpsRemote = nOpsRemote;
-    this.guarantees = SessionGuarantees.valueOf(guarantees);
+    this.guarantees = SessionGuarantees.valueOf(guarantees.toUpperCase());
     this.protocol = Protocol.valueOf(protocol);
     this.migrated = false;
 
@@ -96,6 +96,11 @@ public class KeyspaceManagerRegular implements KeyspaceManager {
       saturnLabel = new AbstractMap.SimpleEntry<>((Inet4Address) address, val);
     else
       writeClock.merge((Inet4Address) address, val, Math::max);
+  }
+
+  @Override
+  public boolean requiresMigration() {
+    return protocol == Protocol.saturn;
   }
 
   public void incorporateWriteMigrateResponse(ResultSet execute) throws UnknownHostException {

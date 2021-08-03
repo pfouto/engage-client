@@ -29,6 +29,8 @@ public interface KeyspaceManager {
 
   void incorporateWriteResponse(ResultSet execute) throws IOException;
 
+  boolean requiresMigration();
+
   enum SessionGuarantees {
     RYW(1), MR(2), WFR(3), MW(4), CAUSAL(5);
 

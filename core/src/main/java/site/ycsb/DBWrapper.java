@@ -177,6 +177,8 @@ public class DBWrapper extends DB {
       if (this.reportLatencyForEachError ||
           this.latencyTrackedErrors.contains(result.getName())) {
         measurementName = op + "-" + result.getName();
+      } else if (result.isMigrationOk()) {
+        measurementName = op + "-MIGRATED";
       } else {
         measurementName = op + "-FAILED";
       }

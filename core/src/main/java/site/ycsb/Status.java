@@ -92,8 +92,13 @@ public class Status {
   public boolean isOk() {
     return this == OK || this == BATCHED_OK;
   }
+  public boolean isMigrationOk() {
+    return this == MIGRATED_OK;
+  }
 
   public static final Status OK = new Status("OK", "The operation completed successfully.");
+  public static final Status MIGRATED_OK = new Status("MIGRATED_OK",
+      "The operation completed successfully after a migration.");
   public static final Status ERROR = new Status("ERROR", "The operation failed.");
   public static final Status NOT_FOUND = new Status("NOT_FOUND", "The requested record was not found.");
   public static final Status NOT_IMPLEMENTED = new Status("NOT_IMPLEMENTED", "The operation is not " +

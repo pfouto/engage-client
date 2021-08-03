@@ -284,7 +284,7 @@ public class CassandraCQLClient extends DB {
     String keyspace = ksManager.currentKeyspace();
     String psKey = host + ":" + keyspace;
 
-    if(migrate && ksManager.justMigrated()){
+    if(ksManager.justMigrated() && (migrate || ksManager.requiresMigration())){
       migrate(ksManager.getPrevHost(), key);
     }
 
@@ -345,7 +345,10 @@ public class CassandraCQLClient extends DB {
           result.put(def.getName(), null);
         }
       }
-      return Status.OK;
+      if(ksManager.justMigrated()){
+        return Status.MIGRATED_OK;
+      } else
+        return Status.OK;
 
     } catch (Exception e) {
       System.err.println("ERROR READ: " + e);
@@ -373,7 +376,7 @@ public class CassandraCQLClient extends DB {
     String keyspace = ksManager.currentKeyspace();
     String psKey = host + ":" + keyspace;
 
-    if(migrate && ksManager.justMigrated()){
+    if(ksManager.justMigrated() && (migrate || ksManager.requiresMigration())){
       migrate(ksManager.getPrevHost(), key);
     }
 
@@ -429,7 +432,10 @@ public class CassandraCQLClient extends DB {
       ResultSet execute = session.execute(boundStmt);
       ksManager.incorporateWriteResponse(execute);
 
-      return Status.OK;
+      if(ksManager.justMigrated()){
+        return Status.MIGRATED_OK;
+      } else
+        return Status.OK;
     } catch (Exception e) {
       System.err.println("ERROR UPDATE: " + e);
       logger.error("Error updating key: {} {}", key, e);

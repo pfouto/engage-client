@@ -28,7 +28,7 @@ public class KeyspaceManagerVisib implements KeyspaceManager{
   public KeyspaceManagerVisib(String localHost, List<String> keyspacesLocal, String protocol, String guarantees)
       throws UnknownHostException {
     this.keyspacesLocal = keyspacesLocal;
-    this.guarantees = SessionGuarantees.valueOf(guarantees);
+    this.guarantees = SessionGuarantees.valueOf(guarantees.toUpperCase());
     this.protocol = Protocol.valueOf(protocol);
 
     readClock = new HashMap<>();
@@ -65,6 +65,11 @@ public class KeyspaceManagerVisib implements KeyspaceManager{
 
   public String metadataToString() {
     return protocol == Protocol.saturn ? saturnLabel.toString() : readClock + " " + writeClock;
+  }
+
+  @Override
+  public boolean requiresMigration() {
+    return protocol == Protocol.saturn;
   }
 
   public void incorporateWriteResponse(ResultSet execute) throws UnknownHostException {
