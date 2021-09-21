@@ -36,6 +36,7 @@ public class ClientThread implements Runnable {
   private Workload workload;
   private int opcount;
   private double targetOpsPerMs;
+  private long thinktimeNs;
 
   private int opsdone;
   private int threadid;
@@ -57,11 +58,12 @@ public class ClientThread implements Runnable {
    * @param completeLatch        The latch tracking the completion of all clients.
    */
   public ClientThread(DB db, boolean dotransactions, Workload workload, Properties props, int opcount,
-                      double targetperthreadperms, CountDownLatch completeLatch) {
+                      double targetperthreadperms, int thinktime, CountDownLatch completeLatch) {
     this.db = db;
     this.dotransactions = dotransactions;
     this.workload = workload;
     this.opcount = opcount;
+    this.thinktimeNs = thinktime * 1000000L;
     opsdone = 0;
     if (targetperthreadperms > 0) {
       targetOpsPerMs = targetperthreadperms;
@@ -170,6 +172,10 @@ public class ClientThread implements Runnable {
     if (targetOpsPerMs > 0) {
       // delay until next tick
       long deadline = startTimeNanos + opsdone * targetOpsTickNs;
+      sleepUntil(deadline);
+      measurements.setIntendedStartTimeNs(deadline);
+    } else if (thinktimeNs > 0){
+      long deadline = System.nanoTime() + thinktimeNs;
       sleepUntil(deadline);
       measurements.setIntendedStartTimeNs(deadline);
     }

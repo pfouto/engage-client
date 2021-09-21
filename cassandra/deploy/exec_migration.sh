@@ -24,6 +24,11 @@ while [[ $# -gt 0 ]]; do
     shift # past argument
     shift # past value
     ;;
+  --think_time)
+    think_time="$2"
+    shift # past argument
+    shift # past value
+    ;;
   --n_clients)
     n_clients="$2"
     shift # past argument
@@ -100,6 +105,10 @@ if [[ -z "${tree_file}" ]]; then
   echo "tree_file not set"
   exit
 fi
+if [[ -z "${think_time}" ]]; then
+  echo "think_time not set"
+  exit
+fi
 
 all_nodes=$(./nodes.sh)
 start_date=$(date +"%H:%M:%S")
@@ -146,6 +155,7 @@ echo -e "$GREEN -- Done disabling swap && setting max_map count $NC"
 # ----------------------------------- LOG PARAMS ------------------------------
 echo -e "$BLUE \n ---- CONFIG ---- $NC"
 echo -e "$GREEN exp_name: $NC ${exp_name}"
+echo -e "$GREEN think_time: $NC ${think_time}"
 # shellcheck disable=SC2086
 echo -e "$GREEN servers (${n_servers}): $NC" ${server_nodes[*]}
 # shellcheck disable=SC2086
@@ -181,7 +191,6 @@ for server_node in "${server_nodes[@]}"; do
 done
 
 records=10000
-target=300
 timer=0
 #rm -rf /tmp/cass
 
@@ -356,7 +365,8 @@ for alg in "${algslist[@]}"; do # ----------------------------------- ALG
           -p engage.migration_enabled=false \
           -p measurementtype=hdrhistogram \
           -p engage.session_guarantees=$guarantee \
-          -p engage.ksmanager=regular -p recordcount=$records -target ${target} \
+          -p engage.ops_local=10 -p engage.ops_remote=10 \
+          -p engage.ksmanager=regular -p recordcount=$records -thinktime ${think_time} \
           > /home/pfouto/engage/logs/migration/client/${exp_path}/${guarantee}_${client_node}" 2>&1 | sed "s/^/[c-$client_node] /" &
           client_pids+=($!)
           i=$((i + 1))

@@ -74,97 +74,82 @@ final class RemainingFormatter {
  * Main class for executing YCSB.
  */
 public final class Client {
-  private Client() {
-    //not used
-  }
-
   public static final String DEFAULT_RECORD_COUNT = "0";
-
   /**
    * The target number of operations to perform.
    */
   public static final String OPERATION_COUNT_PROPERTY = "operationcount";
-
   /**
    * The number of records to load into the database initially.
    */
   public static final String RECORD_COUNT_PROPERTY = "recordcount";
-
   /**
    * The workload class to be loaded.
    */
   public static final String WORKLOAD_PROPERTY = "workload";
-
   /**
    * The database class to be used.
    */
   public static final String DB_PROPERTY = "db";
-
   /**
    * The exporter class to be used. The default is
    * site.ycsb.measurements.exporter.TextMeasurementsExporter.
    */
   public static final String EXPORTER_PROPERTY = "exporter";
-
   /**
    * If set to the path of a file, YCSB will write all output to this file
    * instead of STDOUT.
    */
   public static final String EXPORT_FILE_PROPERTY = "exportfile";
-
   /**
    * The number of YCSB client threads to run.
    */
   public static final String THREAD_COUNT_PROPERTY = "threadcount";
-
   /**
    * Indicates how many inserts to do if less than recordcount.
    * Useful for partitioning the load among multiple servers if the client is the bottleneck.
    * Additionally workloads should support the "insertstart" property which tells them which record to start at.
    */
   public static final String INSERT_COUNT_PROPERTY = "insertcount";
-
   /**
    * Target number of operations per second.
    */
   public static final String TARGET_PROPERTY = "target";
-
+  public static final String THINK_PROPERTY = "think";
   /**
    * The maximum amount of time (in seconds) for which the benchmark will be run.
    */
   public static final String MAX_EXECUTION_TIME = "maxexecutiontime";
-
   /**
    * Whether or not this is the transaction phase (run) or not (load).
    */
   public static final String DO_TRANSACTIONS_PROPERTY = "dotransactions";
-
   /**
    * Whether or not to show status during run.
    */
   public static final String STATUS_PROPERTY = "status";
-
   /**
    * Use label for status (e.g. to label one experiment out of a whole batch).
    */
   public static final String LABEL_PROPERTY = "label";
-
-  /**
-   * An optional thread used to track progress and measure JVM stats.
-   */
-  private static StatusThread statusthread = null;
-
-  // HTrace integration related constants.
-
   /**
    * All keys for configuring the tracing system start with this prefix.
    */
   private static final String HTRACE_KEY_PREFIX = "htrace.";
   private static final String CLIENT_WORKLOAD_INIT_SPAN = "Client#workload_init";
+
+  // HTrace integration related constants.
   private static final String CLIENT_INIT_SPAN = "Client#init";
   private static final String CLIENT_WORKLOAD_SPAN = "Client#workload";
   private static final String CLIENT_CLEANUP_SPAN = "Client#cleanup";
   private static final String CLIENT_EXPORT_MEASUREMENTS_SPAN = "Client#export_measurements";
+  /**
+   * An optional thread used to track progress and measure JVM stats.
+   */
+  private static StatusThread statusthread = null;
+  private Client() {
+    //not used
+  }
 
   public static void usageMessage() {
     System.out.println("Usage: java site.ycsb.Client [options]");
@@ -198,6 +183,11 @@ public final class Client {
   public static boolean checkRequiredProperties(Properties props) {
     if (props.getProperty(WORKLOAD_PROPERTY) == null) {
       System.out.println("Missing property: " + WORKLOAD_PROPERTY);
+      return false;
+    }
+
+    if (props.getProperty(THINK_PROPERTY) != null && props.getProperty(TARGET_PROPERTY) != null) {
+      System.out.println(THINK_PROPERTY + " and " + TARGET_PROPERTY + " are mutually exclusive.");
       return false;
     }
 
@@ -286,6 +276,7 @@ public final class Client {
     int threadcount = Integer.parseInt(props.getProperty(THREAD_COUNT_PROPERTY, "1"));
     String dbname = props.getProperty(DB_PROPERTY, "site.ycsb.BasicDB");
     int target = Integer.parseInt(props.getProperty(TARGET_PROPERTY, "0"));
+    int thinktime = Integer.parseInt(props.getProperty(THINK_PROPERTY, "0"));
 
     //compute the target throughput
     double targetperthreadperms = -1;
@@ -308,7 +299,7 @@ public final class Client {
     //System.err.println("Starting test.");
     final CountDownLatch completeLatch = new CountDownLatch(threadcount);
 
-    final List<ClientThread> clients = initDb(dbname, props, threadcount, targetperthreadperms,
+    final List<ClientThread> clients = initDb(dbname, props, threadcount, targetperthreadperms, thinktime,
         workload, tracer, completeLatch);
 
     if (status) {
@@ -399,7 +390,7 @@ public final class Client {
   }
 
   private static List<ClientThread> initDb(String dbname, Properties props, int threadcount,
-                                           double targetperthreadperms, Workload workload, Tracer tracer,
+                                           double targetperthreadperms, int thinktime, Workload workload, Tracer tracer,
                                            CountDownLatch completeLatch) {
     boolean initFailed = false;
     boolean dotransactions = Boolean.valueOf(props.getProperty(DO_TRANSACTIONS_PROPERTY, String.valueOf(true)));
@@ -416,7 +407,7 @@ public final class Client {
           opcount = Integer.parseInt(props.getProperty(RECORD_COUNT_PROPERTY, DEFAULT_RECORD_COUNT));
         }
       }
-      if (threadcount > opcount && opcount > 0){
+      if (threadcount > opcount && opcount > 0) {
         threadcount = opcount;
         System.out.println("Warning: the threadcount is bigger than recordcount, the threadcount will be recordcount!");
       }
@@ -438,7 +429,7 @@ public final class Client {
         }
 
         ClientThread t = new ClientThread(db, dotransactions, workload, props, threadopcount, targetperthreadperms,
-            completeLatch);
+            thinktime, completeLatch);
         t.setThreadId(threadid);
         t.setThreadCount(threadcount);
         clients.add(t);
@@ -562,6 +553,16 @@ public final class Client {
         int ttarget = Integer.parseInt(args[argindex]);
         props.setProperty(TARGET_PROPERTY, String.valueOf(ttarget));
         argindex++;
+      } else if (args[argindex].compareTo("-thinktime") == 0) {
+        argindex++;
+        if (argindex >= args.length) {
+          usageMessage();
+          System.out.println("Missing argument value for -thinktime.");
+          System.exit(0);
+        }
+        int ttime = Integer.parseInt(args[argindex]);
+        props.setProperty(THINK_PROPERTY, String.valueOf(ttime));
+        argindex++;
       } else if (args[argindex].compareTo("-load") == 0) {
         props.setProperty(DO_TRANSACTIONS_PROPERTY, String.valueOf(false));
         argindex++;
@@ -609,7 +610,7 @@ public final class Client {
         }
 
         //Issue #5 - remove call to stringPropertyNames to make compilable under Java 1.5
-        for (Enumeration e = myfileprops.propertyNames(); e.hasMoreElements();) {
+        for (Enumeration e = myfileprops.propertyNames(); e.hasMoreElements(); ) {
           String prop = (String) e.nextElement();
 
           fileprops.setProperty(prop, myfileprops.getProperty(prop));
@@ -659,7 +660,7 @@ public final class Client {
     //overwrite file properties with properties from the command line
 
     //Issue #5 - remove call to stringPropertyNames to make compilable under Java 1.5
-    for (Enumeration e = props.propertyNames(); e.hasMoreElements();) {
+    for (Enumeration e = props.propertyNames(); e.hasMoreElements(); ) {
       String prop = (String) e.nextElement();
 
       fileprops.setProperty(prop, props.getProperty(prop));

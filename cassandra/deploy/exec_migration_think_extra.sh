@@ -24,6 +24,11 @@ while [[ $# -gt 0 ]]; do
     shift # past argument
     shift # past value
     ;;
+  --think_times)
+    think_times_arg="$2"
+    shift # past argument
+    shift # past value
+    ;;
   --n_clients)
     n_clients="$2"
     shift # past argument
@@ -46,11 +51,6 @@ while [[ $# -gt 0 ]]; do
     ;;
   --algs)
     algs_arg="$2"
-    shift # past argument
-    shift # past value
-    ;;
-  --targets)
-    targets_arg="$2"
     shift # past argument
     shift # past value
     ;;
@@ -88,16 +88,16 @@ if [[ -z "${algs_arg}" ]]; then
   echo "algs not set"
   exit
 fi
-if [[ -z "${targets_arg}" ]]; then
-  echo "targets not set"
-  exit
-fi
 if [[ -z "${guarantees_arg}" ]]; then
   echo "guarantees not set"
   exit
 fi
 if [[ -z "${tree_file}" ]]; then
   echo "tree_file not set"
+  exit
+fi
+if [[ -z "${think_times_arg}" ]]; then
+  echo "think_times not set"
   exit
 fi
 
@@ -113,11 +113,11 @@ fi
 mapfile -t client_nodes < <(tail -n "$n_clients" <<<"$all_nodes")
 mapfile -t server_nodes < <(head -n "$n_servers" <<<"$all_nodes")
 
+IFS=', ' read -r -a thinkslist <<<"$think_times_arg"
 IFS=', ' read -r -a algslist <<<"$algs_arg"
-IFS=', ' read -r -a targetslist <<<"$targets_arg"
 IFS=', ' read -r -a guarantees_list <<<"$guarantees_arg"
 
-total_runs=$((n_runs * ${#algslist[@]} * ${#targetslist[@]} * ${#guarantees_list[@]}))
+total_runs=$((n_runs * ${#algslist[@]} * ${#thinkslist[@]} * ${#guarantees_list[@]}))
 
 echo -e "$GREEN -- Rsync $NC"
 for server_node in "${server_nodes[@]}"; do
@@ -143,16 +143,21 @@ done
 wait
 echo -e "$GREEN -- Done disabling swap && setting max_map count $NC"
 
+records=10000
+timer=0
+reads_per=50
+
 # ----------------------------------- LOG PARAMS ------------------------------
 echo -e "$BLUE \n ---- CONFIG ---- $NC"
 echo -e "$GREEN exp_name: $NC ${exp_name}"
+echo -e "$GREEN reads: $NC ${reads_per}"
 # shellcheck disable=SC2086
 echo -e "$GREEN servers (${n_servers}): $NC" ${server_nodes[*]}
 # shellcheck disable=SC2086
 echo -e "$GREEN clients (${n_clients}): $NC" ${client_nodes[*]}
 echo -e "$GREEN n_runs: $NC ${n_runs}"
 echo -e "$GREEN start_run: $NC ${start_run}"
-echo -e "$GREEN targets: $NC ${targetslist[*]}"
+echo -e "$GREEN think_times: $NC ${thinkslist[*]}"
 echo -e "$GREEN algs: $NC ${algslist[*]}"
 echo -e "$GREEN guarantees: $NC ${guarantees_list[*]}"
 echo -e "$GREEN ---------- $NC"
@@ -180,10 +185,6 @@ for server_node in "${server_nodes[@]}"; do
   oarsh "$server_node" "sed -i \"s/^\(\s*log_visibility\s*:\s*\).*/\1'false'/\"" /tmp/cass/"${OAR_JOB_ID}"/conf/cassandra.yaml
 done
 
-records=10000
-reads_per=50
-writes_per="$((100 - reads_per))"
-timer=0
 #rm -rf /tmp/cass
 
 for alg in "${algslist[@]}"; do # ----------------------------------- ALG
@@ -288,10 +289,12 @@ for alg in "${algslist[@]}"; do # ----------------------------------- ALG
   for run in $(seq "$start_run" $((n_runs + start_run - 1))); do
     echo -e "$GREEN -- STARTING RUN $NC$run"
 
-    for target in "${targetslist[@]}"; do # ---------------------------  READS_PER
-      echo -e "$GREEN -- -- -- STARTING TARGET $NC$target"
+    for think_time in "${thinkslist[@]}"; do # ---------------------------  READS_PER
+      echo -e "$GREEN -- -- -- STARTING THINK  $NC$think_time"
 
-      exp_path="${exp_name}/${alg}/${target}/${run}"
+      writes_per="$((100 - reads_per))"
+
+      exp_path="${exp_name}/${alg}/${think_time}/${run}"
 
       mkdir -p ~/engage/logs/migration_think/client/"${exp_path}"
       mkdir -p ~/engage/logs/migration_think/server/"${exp_path}"
@@ -350,22 +353,22 @@ for alg in "${algslist[@]}"; do # ----------------------------------- ALG
           server_node=${server_nodes[i]}
           oarsh "$client_node" "cd engage && java -Dlog4j.configurationFile=log4j2_client.xml -cp engage-client.jar \
           site.ycsb.Client -P workload -p localdc=$server_node -p engage.protocol=$alg -p readproportion=${reads_per} \
-          -p updateproportion=${writes_per} -threads 1 -p engage.tree_file=tree_${OAR_JOB_ID}.json \
+          -p updateproportion=${writes_per} -threads 25 -p engage.tree_file=tree_${OAR_JOB_ID}.json \
           -p engage.migration_enabled=false \
           -p measurementtype=hdrhistogram \
           -p engage.session_guarantees=$guarantee \
-          -p engage.ops_local=15 \
-          -p engage.ops_remote=1 \
-          -p engage.ksmanager=regular -p recordcount=$records -target ${target} \
+          -p engage.ops_local=10 -p engage.ops_remote=10 \
+          -p engage.ksmanager=regular -p recordcount=$records -thinktime ${think_time} \
           > /home/pfouto/engage/logs/migration_think/client/${exp_path}/${guarantee}_${client_node}" 2>&1 | sed "s/^/[c-$client_node] /" &
           client_pids+=($!)
           oarsh "$client_node" "cd engage && java -Dlog4j.configurationFile=log4j2_client.xml -cp engage-client.jar \
           site.ycsb.Client -P workload -p localdc=$server_node -p engage.protocol=$alg -p readproportion=${reads_per} \
-          -p updateproportion=${writes_per} -threads 50 -p engage.tree_file=tree_${OAR_JOB_ID}.json \
+          -p updateproportion=${writes_per} -threads 25 -p engage.tree_file=tree_${OAR_JOB_ID}.json \
           -p engage.migration_enabled=false \
           -p measurementtype=hdrhistogram \
           -p engage.session_guarantees=$guarantee \
-          -p engage.ksmanager=regular -p recordcount=$records -target 1000 \
+          -p engage.ops_local=10 -p engage.ops_remote=10 \
+          -p engage.ksmanager=visibility -p recordcount=$records -target 500 \
           > /dev/null" 2>&1 | sed "s/^/[c-$client_node] /" &
           client_pids+=($!)
           i=$((i + 1))
@@ -404,7 +407,7 @@ for alg in "${algslist[@]}"; do # ----------------------------------- ALG
         sleep 1
 
       done #guarantee
-    done #reads_per
+    done #think
   done #run
 done #alg
 echo -e "$BLUE -- -- -- -- -- -- -- -- All tests completed $NC"

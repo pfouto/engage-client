@@ -132,7 +132,6 @@ public class KeyspaceManagerRegular implements KeyspaceManager {
   }
 
   public void nextOp() {
-    //TODO migrate local/remote, then home, then local/remote (based on percentage)
     currentOpCount++;
     migrated = false;
     if (local && currentOpCount > nOpsLocal && nOpsRemote > 0) {
