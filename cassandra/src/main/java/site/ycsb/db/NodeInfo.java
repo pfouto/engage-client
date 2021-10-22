@@ -31,4 +31,14 @@ public class NodeInfo {
   public List<String> getPartitions() {
     return partitions;
   }
+
+  @Override
+  public String toString() {
+    return "NodeInfo{" +
+        "local_db=" + local_db +
+        ", up=" + up +
+        ", region=" + region +
+        ", partitions=" + partitions +
+        '}';
+  }
 }

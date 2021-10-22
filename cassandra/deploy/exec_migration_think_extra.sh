@@ -59,6 +59,11 @@ while [[ $# -gt 0 ]]; do
     shift # past argument
     shift # past value
     ;;
+  --timer)
+      timer_arg="$2"
+      shift # past argument
+      shift # past value
+      ;;
   *) # unknown option
     POSITIONAL+=("$1") # save it in an array for later
     shift              # past argument
@@ -100,6 +105,11 @@ if [[ -z "${think_times_arg}" ]]; then
   echo "think_times not set"
   exit
 fi
+if [[ -z "${timer_arg}" ]]; then
+  echo "timer not set"
+  exit
+fi
+
 
 all_nodes=$(./nodes.sh)
 start_date=$(date +"%H:%M:%S")
@@ -144,7 +154,7 @@ wait
 echo -e "$GREEN -- Done disabling swap && setting max_map count $NC"
 
 records=10000
-timer=0
+timer=$timer_arg
 reads_per=50
 
 # ----------------------------------- LOG PARAMS ------------------------------
@@ -160,6 +170,7 @@ echo -e "$GREEN start_run: $NC ${start_run}"
 echo -e "$GREEN think_times: $NC ${thinkslist[*]}"
 echo -e "$GREEN algs: $NC ${algslist[*]}"
 echo -e "$GREEN guarantees: $NC ${guarantees_list[*]}"
+echo -e "$GREEN timer: $NC ${timer}"
 echo -e "$GREEN ---------- $NC"
 echo -e "$GREEN number of runs: $NC${total_runs}"
 echo -e "$BLUE ---- END CONFIG ---- \n $NC"
@@ -298,6 +309,7 @@ for alg in "${algslist[@]}"; do # ----------------------------------- ALG
 
       mkdir -p ~/engage/logs/migration_think/client/"${exp_path}"
       mkdir -p ~/engage/logs/migration_think/server/"${exp_path}"
+      mkdir -p ~/engage/logs/migration_think/metadata/"${exp_path}"
 
       for guarantee in "${guarantees_list[@]}"; do # -------------------- GUARANTEE
         echo -e "$GREEN -- -- -- -- -- -- -- -- STARTING GUARANTEE $NC$guarantee"
@@ -305,6 +317,7 @@ for alg in "${algslist[@]}"; do # ----------------------------------- ALG
 
         rm -r ~/engage/logs/migration_think/client/"${exp_path}"/"${guarantee}"_*
         rm -r ~/engage/logs/migration_think/server/"${exp_path}"/"${guarantee}"_*
+        rm -r ~/engage/logs/migration_think/metadata/"${exp_path}"/"${guarantee}"_*
 
         ((current_run = current_run + 1))
         echo -e "$GREEN RUN ${current_run}/${total_runs} - ($(((current_run - 1) * 100 / total_runs))%) ($start_date) $NC"

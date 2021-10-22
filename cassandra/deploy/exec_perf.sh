@@ -59,6 +59,11 @@ while [[ $# -gt 0 ]]; do
     shift # past argument
     shift # past value
     ;;
+  --payload)
+    payload="$2"
+    shift # past argument
+    shift # past value
+    ;;
   *) # unknown option
     POSITIONAL+=("$1") # save it in an array for later
     shift              # past argument
@@ -99,6 +104,10 @@ fi
 if [[ -z "${tree_file}" ]]; then
   echo "tree_file not set"
   exit
+fi
+if [[ -z "${payload}" ]]; then
+  echo "Setting payload to 1024"
+  payload=1024
 fi
 
 all_nodes=$(./nodes.sh)
@@ -155,11 +164,13 @@ echo -e "$GREEN start_run: $NC ${start_run}"
 echo -e "$GREEN reads percent: $NC ${readslist[*]}"
 echo -e "$GREEN algs: $NC ${algslist[*]}"
 echo -e "$GREEN n threads: $NC ${threadslist[*]}"
+echo -e "$GREEN payloadSize: $NC ${payload}"
 echo -e "$GREEN ---------- $NC"
 echo -e "$GREEN number of runs: $NC${total_runs}"
 echo -e "$BLUE ---- END CONFIG ---- \n $NC"
 
 current_run=0
+timer=100
 sleep 3
 
 echo -e "$GREEN -- Setup tree file $tree_file -> tree_${OAR_JOB_ID}.json $NC"
@@ -211,6 +222,7 @@ for alg in "${algslist[@]}"; do # ----------------------------------- ALG
     oarsh "$server_node" "cd engage && java -Dlog4j.configurationFile=config/log4j2.xml \
 											-DlogFilename=/home/pfouto/engage/logs/perf/metadata/${exp_name}/${alg}/${server_node}_metadata \
 											-jar metadata-1.0-SNAPSHOT.jar mf_enabled=${mf_enabled} \
+											bayou.stab_ms=$timer mf_timeout_ms=$timer \
 											tree_file=tree_${OAR_JOB_ID}.json" 2>&1 | sed "s/^/[m-$server_node] /" &
     meta_pids+=($!)
   done
@@ -232,19 +244,21 @@ for alg in "${algslist[@]}"; do # ----------------------------------- ALG
   i=0
   for client_node in "${client_nodes[@]}"; do
     server_node=${server_nodes[i]}
+    echo "Server node is $server_node for client $client_node"
     oarsh "$client_node" "cd engage && java -Dlog4j.configurationFile=log4j2_client.xml -cp engage-client.jar \
           site.ycsb.Client -load -P workload -p localdc=$server_node -p engage.protocol=$alg -p measurementtype=timeseries \
-          -p engage.ksmanager=regular -p engage.tree_file=tree_${OAR_JOB_ID}.json \
+          -p engage.ksmanager=regular -p engage.tree_file=tree_${OAR_JOB_ID}.json -p fieldlength=${payload} \
           -threads 500 > /dev/null" 2>&1 | sed "s/^/[c-$client_node] /" &
     client_pids+=($!)
     i=$((i + 1))
   done
-  server_node=${server_nodes[i]}
-  oarsh "localhost" "cd engage && java -Dlog4j.configurationFile=log4j2_client.xml -cp engage-client.jar \
-          site.ycsb.Client -load -P workload -p localdc=$server_node -p engage.protocol=$alg -p measurementtype=timeseries \
-          -p engage.ksmanager=regular -p engage.tree_file=tree_${OAR_JOB_ID}.json \
-          -threads 500 > /dev/null" 2>&1 | sed "s/^/[c-$client_node] /" &
-  client_pids+=($!)
+  #Was used to create a client for the global partition (in one of the dc nodes of the edge setting)
+  #server_node=${server_nodes[i]}
+  #oarsh "localhost" "cd engage && java -Dlog4j.configurationFile=log4j2_client.xml -cp engage-client.jar \
+  #        site.ycsb.Client -load -P workload -p localdc=$server_node -p engage.protocol=$alg -p measurementtype=timeseries \
+  #        -p engage.ksmanager=regular -p engage.tree_file=tree_${OAR_JOB_ID}.json \
+  #        -threads 500 > /dev/null" 2>&1 | sed "s/^/[c-localhost] /" &
+  #client_pids+=($!)
 
   for pid in "${client_pids[@]}"; do
     wait "$pid"
@@ -333,7 +347,7 @@ for alg in "${algslist[@]}"; do # ----------------------------------- ALG
           oarsh "$client_node" "cd engage && java -Dlog4j.configurationFile=log4j2_client.xml -cp engage-client.jar \
           site.ycsb.Client -P workload -p localdc=$server_node -p engage.protocol=$alg -p readproportion=${reads_per} \
           -p updateproportion=${writes_per} -threads ${nthreads} -p engage.tree_file=tree_${OAR_JOB_ID}.json \
-          -p engage.ksmanager=regular \
+          -p engage.ksmanager=regular -p fieldlength=${payload} \
           > /home/pfouto/engage/logs/perf/client/${exp_path}/${nthreads}_${client_node}" 2>&1 | sed "s/^/[c-$client_node] /" &
           client_pids+=($!)
           i=$((i + 1))

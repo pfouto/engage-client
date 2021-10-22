@@ -62,6 +62,11 @@ while read -r raw_line; do
     upload=$default_limit
   fi
 
+  if [ "${download}" -eq "1000" ]; then
+     echo -e "${BLUE}Disabling turbo$NC"
+     print_and_exec "${nodes[$i]}" "echo '1' | sudo-g5k tee /sys/devices/system/cpu/intel_pstate/no_turbo"
+  fi
+
   if [ "${download}" -ne "0" ]; then
 
     echo -e "${BLUE}DOWNLOAD $download$NC"

@@ -81,7 +81,7 @@ while read -r raw_line; do
       target_ip=$(getent hosts "${nodes[$j]}" | awk '{print $1}')
       echo -e "latency from ${GREEN}${nodes[$i]}${NC} to ${BLUE}${nodes[$j]}${NC} ($target_ip) is ${RED}${n}${NC}"
       cmd1="sudo-g5k tc class add dev br0 parent 1:1 classid 1:1$j htb rate 1mbit ceil 20000mbit && "
-      cmd2="sudo-g5k tc qdisc add dev br0 parent 1:1$j netem delay ${n}ms $((n / 20))ms distribution normal && "
+      cmd2="sudo-g5k tc qdisc add dev br0 parent 1:1$j netem delay ${n}ms $((n / 10))ms distribution normal && "
       cmd3="sudo-g5k tc filter add dev br0 protocol ip parent 1:0 prio 1 u32 match ip dst $target_ip flowid 1:1$j"
       print_and_exec "${nodes[$i]}" "$cmd1$cmd2$cmd3"
     fi

@@ -20,4 +20,12 @@ public class Tree {
   public Map<String, NodeInfo> getNodes() {
     return nodes;
   }
+
+  @Override
+  public String toString() {
+    return "Tree{" +
+        "nodes=" + nodes +
+        ", links=" + links +
+        '}';
+  }
 }

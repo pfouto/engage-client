@@ -21,7 +21,7 @@ requestdistribution=zipfian
 fieldcount=1
 fieldlength=1024
 
-cassandra.readtimeoutmillis=20000
+cassandra.readtimeoutmillis=40000
 cassandra.connecttimeoutmillis=70000
 
 recordcount=100000
@@ -30,9 +30,9 @@ operationcount=40000000
 readproportion=0.5
 updateproportion=0.5
 
-engage.migration_enabled=true
+engage.migration_enabled=false
 engage.session_guarantees=CAUSAL
-engage.protocol=bayou
+engage.protocol=PLACEHOLDER
 
 
 engage.ops_local=95
