@@ -376,12 +376,12 @@ for alg in "${algslist[@]}"; do # ----------------------------------- ALG
           client_pids+=($!)
           oarsh "$client_node" "cd engage && java -Dlog4j.configurationFile=log4j2_client.xml -cp engage-client.jar \
           site.ycsb.Client -P workload -p localdc=$server_node -p engage.protocol=$alg -p readproportion=${reads_per} \
-          -p updateproportion=${writes_per} -threads 25 -p engage.tree_file=tree_${OAR_JOB_ID}.json \
+          -p updateproportion=${writes_per} -threads 50 -p engage.tree_file=tree_${OAR_JOB_ID}.json \
           -p engage.migration_enabled=false \
           -p measurementtype=hdrhistogram \
           -p engage.session_guarantees=$guarantee \
           -p engage.ops_local=10 -p engage.ops_remote=10 \
-          -p engage.ksmanager=visibility -p recordcount=$records -target 500 \
+          -p engage.ksmanager=visibility -p recordcount=$records -target 1000 \
           > /dev/null" 2>&1 | sed "s/^/[c-$client_node] /" &
           client_pids+=($!)
           i=$((i + 1))

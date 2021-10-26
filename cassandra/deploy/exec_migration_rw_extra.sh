@@ -191,14 +191,14 @@ for server_node in "${server_nodes[@]}"; do
 done
 
 records=10000
-timer=0
+timer=100
 #rm -rf /tmp/cass
 
 for alg in "${algslist[@]}"; do # ----------------------------------- ALG
   echo -e "$GREEN -- -- -- -- -- -- STARTING ALG $NC$alg"
 
-  mkdir -p ~/engage/logs/migration/metadata/"${exp_name}"/"${alg}"
-  mkdir -p ~/engage/logs/migration/server/"${exp_name}"/"${alg}"
+  mkdir -p ~/engage/logs/migration_rw/metadata/"${exp_name}"/"${alg}"
+  mkdir -p ~/engage/logs/migration_rw/server/"${exp_name}"/"${alg}"
 
   if [ "$alg" == "saturn" ]; then
     mf_enabled="false"
@@ -221,7 +221,7 @@ for alg in "${algslist[@]}"; do # ----------------------------------- ALG
   meta_pids=()
   for server_node in "${server_nodes[@]}"; do
     oarsh "$server_node" "cd engage && java -Dlog4j.configurationFile=config/log4j2.xml \
-											-DlogFilename=/home/pfouto/engage/logs/migration/metadata/${exp_name}/${alg}/${server_node}_metadata_load \
+											-DlogFilename=/home/pfouto/engage/logs/migration_rw/metadata/${exp_name}/${alg}/${server_node}_metadata_load \
 											-jar metadata-1.0-SNAPSHOT.jar mf_enabled=${mf_enabled} \
 											tree_file=tree_${OAR_JOB_ID}.json" 2>&1 | sed "s/^/[m-$server_node] /" &
     meta_pids+=($!)
@@ -304,15 +304,17 @@ for alg in "${algslist[@]}"; do # ----------------------------------- ALG
 
       exp_path="${exp_name}/${alg}/${reads_per}/${run}"
 
-      mkdir -p ~/engage/logs/migration/client/"${exp_path}"
-      mkdir -p ~/engage/logs/migration/server/"${exp_path}"
+      mkdir -p ~/engage/logs/migration_rw/client/"${exp_path}"
+      mkdir -p ~/engage/logs/migration_rw/server/"${exp_path}"
+      mkdir -p ~/engage/logs/migration_rw/metadata/"${exp_path}"
 
       for guarantee in "${guarantees_list[@]}"; do # -------------------- GUARANTEE
         echo -e "$GREEN -- -- -- -- -- -- -- -- STARTING GUARANTEE $NC$guarantee"
         echo -e "$GREEN -- -- -- -- -- -- -- -- - $NC$exp_path/$guarantee"
 
-        rm -r ~/engage/logs/migration/client/"${exp_path}"/"${guarantee}"_*
-        rm -r ~/engage/logs/migration/server/"${exp_path}"/"${guarantee}"_*
+        rm -r ~/engage/logs/migration_rw/client/"${exp_path}"/"${guarantee}"_*
+        rm -r ~/engage/logs/migration_rw/server/"${exp_path}"/"${guarantee}"_*
+        rm -r ~/engage/logs/migration_rw/metadata/"${exp_path}"/"${guarantee}"_*
 
         ((current_run = current_run + 1))
         echo -e "$GREEN RUN ${current_run}/${total_runs} - ($(((current_run - 1) * 100 / total_runs))%) ($start_date) $NC"
@@ -334,7 +336,7 @@ for alg in "${algslist[@]}"; do # ----------------------------------- ALG
         meta_pids=()
         for server_node in "${server_nodes[@]}"; do
           oarsh "$server_node" "cd engage && java -Dlog4j.configurationFile=config/log4j2.xml \
-											-DlogFilename=/home/pfouto/engage/logs/migration/metadata/${exp_path}/${guarantee}_${server_node} \
+											-DlogFilename=/home/pfouto/engage/logs/migration_rw/metadata/${exp_path}/${guarantee}_${server_node} \
 											-jar metadata-1.0-SNAPSHOT.jar mf_enabled=${mf_enabled} setup_cass=false \
 											bayou.stab_ms=$timer mf_timeout_ms=$timer \
 											tree_file=tree_${OAR_JOB_ID}.json" 2>&1 | sed "s/^/[m-$server_node] /" &
@@ -367,7 +369,17 @@ for alg in "${algslist[@]}"; do # ----------------------------------- ALG
           -p engage.session_guarantees=$guarantee \
           -p engage.ops_local=10 -p engage.ops_remote=10 \
           -p engage.ksmanager=regular -p recordcount=$records -thinktime ${think_time} \
-          > /home/pfouto/engage/logs/migration/client/${exp_path}/${guarantee}_${client_node}" 2>&1 | sed "s/^/[c-$client_node] /" &
+          > /home/pfouto/engage/logs/migration_rw/client/${exp_path}/${guarantee}_${client_node}" 2>&1 | sed "s/^/[c-$client_node] /" &
+          client_pids+=($!)
+          oarsh "$client_node" "cd engage && java -Dlog4j.configurationFile=log4j2_client.xml -cp engage-client.jar \
+          site.ycsb.Client -P workload -p localdc=$server_node -p engage.protocol=$alg -p readproportion=${reads_per} \
+          -p updateproportion=${writes_per} -threads 25 -p engage.tree_file=tree_${OAR_JOB_ID}.json \
+          -p engage.migration_enabled=false \
+          -p measurementtype=hdrhistogram \
+          -p engage.session_guarantees=$guarantee \
+          -p engage.ops_local=10 -p engage.ops_remote=10 \
+          -p engage.ksmanager=visibility -p recordcount=$records -target 500 \
+          > /dev/null" 2>&1 | sed "s/^/[c-$client_node] /" &
           client_pids+=($!)
           i=$((i + 1))
         done
@@ -413,7 +425,7 @@ echo "Deleting tree file"
 rm "$HOME/engage/tree_${OAR_JOB_ID}.json"
 echo "Getting logs"
 for server_node in "${server_nodes[@]}"; do
-  oarsh "$server_node" "cp -r /tmp/cass/${OAR_JOB_ID}/results/* /home/pfouto/engage/logs/migration/server/" &
+  oarsh "$server_node" "cp -r /tmp/cass/${OAR_JOB_ID}/results/* /home/pfouto/engage/logs/migration_rw/server/" &
 done
 wait
 exit

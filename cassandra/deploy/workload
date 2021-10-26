@@ -21,8 +21,9 @@ requestdistribution=zipfian
 fieldcount=1
 fieldlength=1024
 
-cassandra.readtimeoutmillis=40000
+cassandra.readtimeoutmillis=60000
 cassandra.connecttimeoutmillis=70000
+cassandra.maxrequests=1400
 
 recordcount=100000
 operationcount=40000000

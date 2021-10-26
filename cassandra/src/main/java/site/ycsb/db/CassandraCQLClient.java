@@ -28,6 +28,7 @@ public class CassandraCQLClient extends DB {
   public static final String READ_CONSISTENCY_LEVEL_PROPERTY = "cassandra.readconsistencylevel";
   public static final String WRITE_CONSISTENCY_LEVEL_PROPERTY = "cassandra.writeconsistencylevel";
   public static final String MAX_CONNECTIONS_PROPERTY = "cassandra.maxconnections";
+  public static final String MAX_REQUESTS_PER_CONNECTION_PROPERTY = "cassandra.maxrequests";
   public static final String CORE_CONNECTIONS_PROPERTY = "cassandra.coreconnections";
   public static final String CONNECT_TIMEOUT_MILLIS_PROPERTY = "cassandra.connecttimeoutmillis";
   public static final String READ_TIMEOUT_MILLIS_PROPERTY = "cassandra.readtimeoutmillis";
@@ -153,6 +154,11 @@ public class CassandraCQLClient extends DB {
               cluster.getConfiguration().getPoolingOptions()
                   .setMaxConnectionsPerHost(HostDistance.LOCAL, Integer.parseInt(maxConnections));
             }
+            String maxRequests = getProperties().getProperty(MAX_REQUESTS_PER_CONNECTION_PROPERTY);
+            if (maxRequests != null) {
+              cluster.getConfiguration().getPoolingOptions()
+                  .setMaxRequestsPerConnection(HostDistance.LOCAL, Integer.parseInt(maxRequests));
+            }
             String coreConnections = getProperties().getProperty(CORE_CONNECTIONS_PROPERTY);
             if (coreConnections != null) {
               cluster.getConfiguration().getPoolingOptions()
@@ -263,6 +269,8 @@ public class CassandraCQLClient extends DB {
     } catch (Exception e) {
       System.err.println("ERROR MIGRATING: " + e);
       logger.error("Error migrating: {} {}", host, e);
+      System.exit(1);
+
     }
   }
 
@@ -353,6 +361,7 @@ public class CassandraCQLClient extends DB {
     } catch (Exception e) {
       System.err.println("ERROR READ: " + e);
       logger.error("Error reading key: {} {}", key, e);
+      System.exit(1);
       return Status.ERROR;
     }
 
@@ -439,6 +448,8 @@ public class CassandraCQLClient extends DB {
     } catch (Exception e) {
       System.err.println("ERROR UPDATE: " + e);
       logger.error("Error updating key: {} {}", key, e);
+      System.exit(1);
+
     }
     return Status.ERROR;
   }
@@ -515,6 +526,8 @@ public class CassandraCQLClient extends DB {
     } catch (Exception e) {
       System.err.println("ERROR INSERT: " + e);
       logger.error("Error inserting key: {} {}", key, e);
+      System.exit(1);
+
     }
     return Status.ERROR;
   }
@@ -530,7 +543,7 @@ public class CassandraCQLClient extends DB {
   }
 
   private enum KsManager {
-    regular, visibility;
+    regular, visibility
   }
 
 }
