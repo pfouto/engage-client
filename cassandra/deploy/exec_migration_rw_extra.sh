@@ -191,7 +191,7 @@ for server_node in "${server_nodes[@]}"; do
 done
 
 records=10000
-timer=100
+timer=200
 #rm -rf /tmp/cass
 
 for alg in "${algslist[@]}"; do # ----------------------------------- ALG
@@ -256,7 +256,7 @@ for alg in "${algslist[@]}"; do # ----------------------------------- ALG
   done
   echo -e "$BLUE All clients finished $NC"
 
-  sleep 20
+  sleep 60
 
   echo -e "$BLUE Killing cassandra $NC"
   for server_node in "${server_nodes[@]}"; do

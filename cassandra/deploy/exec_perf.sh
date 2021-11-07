@@ -263,9 +263,9 @@ for alg in "${algslist[@]}"; do # ----------------------------------- ALG
   for pid in "${client_pids[@]}"; do
     wait "$pid"
   done
-  echo -e "$BLUE All clients finished $NC"
+  echo -e "$BLUE All clients finished, sleeping 60 $NC"
 
-  sleep 20
+  sleep 60
 
   echo -e "$BLUE Killing cassandra $NC"
   for server_node in "${server_nodes[@]}"; do

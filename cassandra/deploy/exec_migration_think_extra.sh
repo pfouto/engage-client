@@ -260,7 +260,7 @@ for alg in "${algslist[@]}"; do # ----------------------------------- ALG
   done
   echo -e "$BLUE All clients finished $NC"
 
-  sleep 40
+  sleep 60
 
   echo -e "$BLUE Killing cassandra $NC"
   for server_node in "${server_nodes[@]}"; do
